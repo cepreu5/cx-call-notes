@@ -13,4 +13,6 @@ interface CallNoteDao {
     suspend fun getAll(): List<CallNoteEntity>
     @Query("SELECT * FROM call_notes WHERE callerName LIKE '%' || :query || '%' OR phoneNumber LIKE '%' || :query || '%' OR noteText LIKE '%' || :query || '%' ORDER BY createdAt DESC")
     suspend fun search(query: String): List<CallNoteEntity>
+    @Delete
+    suspend fun delete(note: CallNoteEntity)
 }

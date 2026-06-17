@@ -14,6 +14,7 @@ data class ContactEntity(
     val displayName: String,
     val company: String? = null,
     val note: String? = null,
+    val tags: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )

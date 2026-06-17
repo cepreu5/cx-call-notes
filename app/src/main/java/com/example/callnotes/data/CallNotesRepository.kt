@@ -36,4 +36,6 @@ class CallNotesRepository(private val db: AppDatabase) {
             callSessionId = sessionId
         )
     )
+    suspend fun deleteContact(contact: ContactEntity) = db.contactDao().delete(contact)
+    suspend fun deleteNote(note: CallNoteEntity) = db.callNoteDao().delete(note)
 }

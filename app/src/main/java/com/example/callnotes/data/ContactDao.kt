@@ -15,4 +15,6 @@ interface ContactDao {
     suspend fun getAll(): List<ContactEntity>
     @Query("SELECT * FROM contacts WHERE displayName LIKE '%' || :query || '%' OR phoneNumber LIKE '%' || :query || '%' ORDER BY updatedAt DESC")
     suspend fun search(query: String): List<ContactEntity>
+    @Delete
+    suspend fun delete(contact: ContactEntity)
 }
