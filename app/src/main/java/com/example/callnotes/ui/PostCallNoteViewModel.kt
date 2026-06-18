@@ -30,7 +30,7 @@ class PostCallNoteViewModel(
     private val prefs = context.getSharedPreferences("cx_call_notes_prefs", Context.MODE_PRIVATE)
     fun init(phone: String, sessionId: Long? = null) {
         val tagsStr = prefs.getString("tags_list", "Клиент,Важно,Партньор,Доставчик,Лично") ?: "Клиент,Важно,Партньор,Доставчик,Лично"
-        val availableTags = tagsStr.split(",").filter { it.isNotBlank() }
+        val availableTags = tagsStr.split(",").map { it.trim() }.filter { it.isNotBlank() }
         _uiState.value = _uiState.value.copy(
             phoneNumber = phone,
             sessionId = sessionId,
@@ -38,17 +38,36 @@ class PostCallNoteViewModel(
         )
         if (phone.isNotBlank()) {
             viewModelScope.launch {
-                repository.findContact(phone)?.let { contact ->
-                    val selected = contact.tags?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+                val contact = repository.findContact(phone)
+                if (contact != null) {
+                    val selected = contact.tags?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
                     _uiState.value = _uiState.value.copy(
                         callerName = contact.displayName,
                         noteText = contact.note ?: "",
                         selectedTags = selected,
                         isEditMode = true
                     )
+                } else {
+                    val systemName = getNameFromPhoneContacts(phone) ?: ""
+                    if (systemName.isNotBlank()) {
+                        _uiState.value = _uiState.value.copy(callerName = systemName)
+                    }
                 }
             }
         }
+    }
+    private fun getNameFromPhoneContacts(phoneNumber: String): String? {
+        if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_CONTACTS) != android.content.pm.PackageManager.PERMISSION_GRANTED) return null
+        val uri = android.net.Uri.withAppendedPath(android.provider.ContactsContract.PhoneLookup.CONTENT_FILTER_URI, android.net.Uri.encode(phoneNumber))
+        val projection = arrayOf(android.provider.ContactsContract.PhoneLookup.DISPLAY_NAME)
+        try {
+            context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    return cursor.getString(0)
+                }
+            }
+        } catch (_: Exception) {}
+        return null
     }
     fun updatePhoneNumber(value: String) {
         _uiState.value = _uiState.value.copy(phoneNumber = value)

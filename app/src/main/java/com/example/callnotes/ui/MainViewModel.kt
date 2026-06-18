@@ -10,6 +10,9 @@ import com.example.callnotes.data.ContactEntity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 data class MainUiState(
     val contacts: List<ContactEntity> = emptyList(),
@@ -36,9 +39,9 @@ class MainViewModel(
         load()
     }
     fun loadSettings() {
-        val appBg = prefs.getString("app_bg_color", "#FFFFFF") ?: "#FFFFFF"
-        val contactsBg = prefs.getString("contacts_bg_color", "#FFFFFF") ?: "#FFFFFF"
-        val notesBg = prefs.getString("notes_bg_color", "#E8F5E9") ?: "#E8F5E9"
+        val appBg = prefs.getString("app_bg_color", "default") ?: "default"
+        val contactsBg = prefs.getString("contacts_bg_color", "default") ?: "default"
+        val notesBg = prefs.getString("notes_bg_color", "default") ?: "default"
         val tagsStr = prefs.getString("tags_list", "Клиент,Важно,Партньор,Доставчик,Лично") ?: "Клиент,Важно,Партньор,Доставчик,Лично"
         val tagsList = tagsStr.split(",").filter { it.isNotBlank() }
         _state.value = _state.value.copy(
@@ -60,9 +63,33 @@ class MainViewModel(
     }
     fun load() {
         viewModelScope.launch {
-            val q = _state.value.searchQuery
-            val contacts = if (q.isBlank()) repository.getAllContacts() else repository.searchContacts(q)
-            val notes = if (q.isBlank()) repository.getAllNotes() else repository.searchNotes(q)
+            val q = _state.value.searchQuery.trim()
+            val allContacts = repository.getAllContacts()
+            val allNotes = repository.getAllNotes()
+            val contacts = if (q.isBlank()) {
+                allContacts
+            } else {
+                val isDate = q.matches(Regex("\\d{2}\\.\\d{2}\\.\\d{4}"))
+                allContacts.filter { c ->
+                    if (isDate) {
+                        SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(Date(c.updatedAt)) == q
+                    } else {
+                        c.displayName.contains(q, true) || c.phoneNumber.contains(q, true) || (c.note?.contains(q, true) == true) || (c.tags?.contains(q, true) == true)
+                    }
+                }
+            }
+            val notes = if (q.isBlank()) {
+                allNotes
+            } else {
+                val isDate = q.matches(Regex("\\d{2}\\.\\d{2}\\.\\d{4}"))
+                allNotes.filter { n ->
+                    if (isDate) {
+                        SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(Date(n.createdAt)) == q
+                    } else {
+                        (n.callerName?.contains(q, true) == true) || n.phoneNumber.contains(q, true) || n.noteText.contains(q, true)
+                    }
+                }
+            }
             _state.value = _state.value.copy(
                 contacts = contacts,
                 notes = notes

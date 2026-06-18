@@ -1,6 +1,30 @@
 *команда за проверка на грешки:
 .\gradlew.bat compileDebugKotlin --stacktrace --info*
 
+
+MainActivity.kt
+val presets = listOf(
+        "default" to Color.LightGray,
+        "#FFF9C4" to Color(0xFFFFF9C4),
+        "#E3F2FD" to Color(0xFFE3F2FD),
+        "#E8F5E9" to Color(0xFFE8F5E9),
+        "#F5F5F5" to Color(0xFFF5F5F5),
+        "#E0F2F1" to Color(0xFFE0F2F1)
+        "default" to Color(0xFF37474F),
+        "#121212" to Color(0xFF121212),
+        "#1A237E" to Color(0xFF1A237E),
+        "#1B5E20" to Color(0xFF1B5E20),
+        "#3E2723" to Color(0xFF3E2723),
+        "#004D40" to Color(0xFF004D40)
+
+surfaceContainerLow (фонът на контакт картите) и secondaryContainer (фонът на бележки картите) автоматично стават много тъмни/черни.
+
+Решението: Принудих приложението винаги да използва светла тема с ясно дефинирани цветове:
+
+surfaceContainerLow = Color(0xFFF3EDF7) — светло лилав фон за контакт панели
+secondaryContainer = Color(0xFFE8DEF8) — леко по-наситен лилав за бележки панели
+background = Color(0xFFFFFBFE) — почти бял общ фон        
+
 ### Задание
 искам да създадем Андроид приложение със следните възможности:
 - при получаване на позвъняване проверява номера в локална база данни и ако намери запис го показва на екрана за информация, без да ангажира самото обаждане.

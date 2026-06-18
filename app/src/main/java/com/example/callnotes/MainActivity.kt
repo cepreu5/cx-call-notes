@@ -6,19 +6,20 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -69,7 +70,10 @@ class MainActivity : ComponentActivity() {
             CallNotesTheme {
                 val state by viewModel.state.collectAsState()
                 var showSettings by remember { mutableStateOf(false) }
-                val parsedAppBg = remember(state.appBgColor) { parseColor(state.appBgColor, Color(0xFFF5F5F5)) }
+                val defaultAppBg = MaterialTheme.colorScheme.background
+                val parsedAppBg = remember(state.appBgColor, defaultAppBg) {
+                    if (state.appBgColor == "default") defaultAppBg else parseColor(state.appBgColor, Color(0xFFF5F5F5))
+                }
                 Scaffold(
                     modifier = Modifier.background(parsedAppBg),
                     containerColor = parsedAppBg,
@@ -78,12 +82,20 @@ class MainActivity : ComponentActivity() {
                         TopAppBar(
                             title = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        Icons.Default.Call,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(28.dp)
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
+                                            .padding(6.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Call,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text("CX Call Notes", fontWeight = FontWeight.Bold)
                                 }
@@ -147,13 +159,14 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         viewModel.load()
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALL_LOG) == PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALL_LOG) == PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
         ) {
             checkOverlayPermission()
         }
     }
     private fun requestPermissionsIfNeeded() {
-        val perms = arrayOf(Manifest.permission.READ_PHONE_STATE, Manifest.permission.READ_CALL_LOG)
+        val perms = arrayOf(Manifest.permission.READ_PHONE_STATE, Manifest.permission.READ_CALL_LOG, Manifest.permission.READ_CONTACTS)
         val needed = perms.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
         if (needed.isNotEmpty()) {
             permissionLauncher.launch(needed.toTypedArray())
@@ -183,7 +196,7 @@ class MainActivity : ComponentActivity() {
 }
 
 fun parseColor(hex: String, default: Color): Color = try {
-    Color(android.graphics.Color.parseColor(hex))
+    if (hex == "default") default else Color(android.graphics.Color.parseColor(hex))
 } catch (_: Exception) {
     default
 }
@@ -238,6 +251,7 @@ fun MainScreen(
             0 -> ContactsList(
                 contacts = state.contacts,
                 limit = state.contactsLimit,
+                appBgColor = state.appBgColor,
                 contactsBgColor = state.contactsBgColor,
                 onSelectSearch = onSearchQueryChange,
                 onDelete = onDeleteContact,
@@ -247,6 +261,7 @@ fun MainScreen(
             1 -> NotesList(
                 notes = state.notes,
                 limit = state.notesLimit,
+                appBgColor = state.appBgColor,
                 notesBgColor = state.notesBgColor,
                 onSelectSearch = onSearchQueryChange,
                 onDelete = onDeleteNote,
@@ -261,6 +276,7 @@ fun MainScreen(
 fun ContactsList(
     contacts: List<ContactEntity>,
     limit: Int,
+    appBgColor: String,
     contactsBgColor: String,
     onSelectSearch: (String) -> Unit,
     onDelete: (ContactEntity) -> Unit,
@@ -293,7 +309,7 @@ fun ContactsList(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(visibleContacts, key = { it.id }) { contact ->
-                SwipeToDeleteWrapper(onDelete = { onDelete(contact) }) {
+                SwipeToDeleteWrapper(appBgColor = appBgColor, onDelete = { onDelete(contact) }) {
                     ContactCard(contact, contactsBgColor, onSelectSearch, onEdit)
                 }
             }
@@ -320,22 +336,25 @@ fun ContactCard(
 ) {
     val sdf = remember { SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()) }
     val formattedDate = remember(contact.updatedAt) { sdf.format(Date(contact.updatedAt)) }
-    val cardBg = remember(contactsBgColor) { parseColor(contactsBgColor, Color(0xFFFFFFFF)) }
+    val defaultCardBg = MaterialTheme.colorScheme.surfaceContainerLow
+    val cardBg = remember(contactsBgColor) { parseColor(contactsBgColor, defaultCardBg) }
+    val tagsList = remember(contact.tags) { contact.tags?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList() }
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onEdit(contact) },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = cardBg)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = contact.displayName,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF333333),
                     modifier = Modifier.combinedClickable(
                         onClick = { onEdit(contact) },
                         onLongClick = { onSelectSearch(contact.displayName) }
@@ -352,30 +371,30 @@ fun ContactCard(
                 )
             }
             if (!contact.note.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 WordSelectableText(contact.note, onSelectSearch)
             }
-            if (!contact.tags.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 FlowRow(
+                    modifier = Modifier.weight(1f),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    contact.tags.split(",").filter { it.isNotBlank() }.forEach { tag ->
-                        SuggestionChip(
-                            onClick = { onSelectSearch(tag) },
-                            label = { Text(tag, style = MaterialTheme.typography.bodySmall) }
-                        )
+                    tagsList.forEach { tag ->
+                        TagChip(tag = tag, onSelectSearch = onSelectSearch)
                     }
                 }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                Spacer(modifier = Modifier.width(8.dp))
                 val formattedOnlyDate = remember(contact.updatedAt) { SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(Date(contact.updatedAt)) }
                 Text(
                     text = formattedDate,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline,
+                    color = Color(0xFF666666),
                     modifier = Modifier.combinedClickable(
                         onClick = {},
                         onLongClick = { onSelectSearch(formattedOnlyDate) }
@@ -390,6 +409,7 @@ fun ContactCard(
 fun NotesList(
     notes: List<CallNoteEntity>,
     limit: Int,
+    appBgColor: String,
     notesBgColor: String,
     onSelectSearch: (String) -> Unit,
     onDelete: (CallNoteEntity) -> Unit,
@@ -422,7 +442,7 @@ fun NotesList(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(visibleNotes, key = { it.id }) { note ->
-                SwipeToDeleteWrapper(onDelete = { onDelete(note) }) {
+                SwipeToDeleteWrapper(appBgColor = appBgColor, onDelete = { onDelete(note) }) {
                     NoteCard(note, notesBgColor, onSelectSearch, onEdit)
                 }
             }
@@ -449,22 +469,24 @@ fun NoteCard(
 ) {
     val sdf = remember { SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()) }
     val formattedDate = remember(note.createdAt) { sdf.format(Date(note.createdAt)) }
-    val cardBg = remember(notesBgColor) { parseColor(notesBgColor, Color(0xFFE8F5E9)) }
+    val defaultCardBg = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+    val cardBg = remember(notesBgColor) { parseColor(notesBgColor, defaultCardBg) }
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onEdit(note) },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = cardBg)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = note.callerName ?: "Непознат",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF333333),
                     modifier = Modifier.combinedClickable(
                         onClick = { onEdit(note) },
                         onLongClick = { onSelectSearch(note.callerName ?: "Непознат") }
@@ -480,15 +502,15 @@ fun NoteCard(
                     )
                 )
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             WordSelectableText(note.noteText, onSelectSearch)
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
                 val formattedOnlyDate = remember(note.createdAt) { SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(Date(note.createdAt)) }
                 Text(
                     text = formattedDate,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline,
+                    color = Color(0xFF666666),
                     modifier = Modifier.combinedClickable(
                         onClick = {},
                         onLongClick = { onSelectSearch(formattedOnlyDate) }
@@ -509,6 +531,7 @@ fun WordSelectableText(text: String, onSelectWord: (String) -> Unit) {
             Text(
                 text = word + " ",
                 style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF555555),
                 modifier = Modifier.combinedClickable(
                     onClick = {},
                     onLongClick = { if (cleanWord.isNotEmpty()) onSelectWord(cleanWord) }
@@ -518,9 +541,26 @@ fun WordSelectableText(text: String, onSelectWord: (String) -> Unit) {
     }
 }
 
+@Composable
+fun TagChip(tag: String, onSelectSearch: (String) -> Unit) {
+    Box(
+        modifier = Modifier
+            .background(Color(0xFFFFE0B2), RoundedCornerShape(6.dp))
+            .border(1.dp, Color(0xFFFF9800), RoundedCornerShape(6.dp))
+            .clickable { onSelectSearch(tag) }
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+    ) {
+        Text(
+            text = tag,
+            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+            color = Color(0xFFE65100)
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SwipeToDeleteWrapper(onDelete: () -> Unit, content: @Composable () -> Unit) {
+fun SwipeToDeleteWrapper(appBgColor: String, onDelete: () -> Unit, content: @Composable () -> Unit) {
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = {
             if (it == SwipeToDismissBoxValue.StartToEnd) {
@@ -529,20 +569,154 @@ fun SwipeToDeleteWrapper(onDelete: () -> Unit, content: @Composable () -> Unit) 
             } else {
                 false
             }
-        }
+        },
+        positionalThreshold = { distance -> distance * 0.8f }
     )
+    val parsedAppBg = remember(appBgColor) {
+        if (appBgColor == "default") Color.Transparent else parseColor(appBgColor, Color.Transparent)
+    }
     SwipeToDismissBox(
         state = dismissState,
         enableDismissFromEndToStart = false,
         backgroundContent = {
+            val isSwiping = dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd
             Box(
-                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.errorContainer).padding(horizontal = 16.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(if (isSwiping) MaterialTheme.colorScheme.errorContainer else parsedAppBg)
+                    .padding(horizontal = 16.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
-                Icon(Icons.Default.Delete, contentDescription = "Изтрий", tint = MaterialTheme.colorScheme.onErrorContainer)
+                if (isSwiping) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Изтрий",
+                        tint = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
             }
         },
         content = { content() }
+    )
+}
+
+@Composable
+fun ColorSelectorRow(
+    label: String,
+    selectedColor: String,
+    onColorSelected: (String) -> Unit
+) {
+    val presets = listOf(
+        "default" to Color(0xFF37474F),
+        "#121212" to Color(0xFF121212),
+        "#1A237E" to Color(0xFF1A237E),
+        "#1B5E20" to Color(0xFF1B5E20),
+        "#3E2723" to Color(0xFF3E2723),
+        "#004D40" to Color(0xFF004D40)
+    )
+    var showPicker by remember { mutableStateOf(false) }
+    Column {
+        Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            presets.forEach { (code, color) ->
+                val isSelected = selectedColor == code
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .background(color, CircleShape)
+                        .border(
+                            width = if (isSelected) 3.dp else 1.dp,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray,
+                            shape = CircleShape
+                        )
+                        .clickable { onColorSelected(code) }
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .background(Color.DarkGray, CircleShape)
+                    .border(
+                        width = if (selectedColor.startsWith("#") && presets.none { it.first == selectedColor }) 3.dp else 1.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                        shape = CircleShape
+                    )
+                    .clickable { showPicker = true },
+                contentAlignment = Alignment.Center
+            ) {
+                Text("+", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+        }
+        if (showPicker) {
+            CustomColorPickerDialog(
+                initialColor = if (selectedColor.startsWith("#")) selectedColor else "#121212",
+                onDismiss = { showPicker = false },
+                onColorSelected = {
+                    onColorSelected(it)
+                    showPicker = false
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun CustomColorPickerDialog(
+    initialColor: String,
+    onDismiss: () -> Unit,
+    onColorSelected: (String) -> Unit
+) {
+    var r by remember { mutableStateOf(20) }
+    var g by remember { mutableStateOf(20) }
+    var b by remember { mutableStateOf(20) }
+    LaunchedEffect(initialColor) {
+        try {
+            val parsed = android.graphics.Color.parseColor(initialColor)
+            r = android.graphics.Color.red(parsed)
+            g = android.graphics.Color.green(parsed)
+            b = android.graphics.Color.blue(parsed)
+        } catch (_: Exception) {}
+    }
+    val currentColor = Color(r, g, b)
+    val hexString = String.format("#%02X%02X%02X", r, g, b)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Избор на цвят") },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(60.dp)
+                        .background(currentColor, RoundedCornerShape(8.dp))
+                        .border(1.dp, Color.Gray, RoundedCornerShape(8.dp))
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("Код: $hexString", fontWeight = FontWeight.Bold)
+                Text("Червено: $r")
+                Slider(value = r.toFloat(), onValueChange = { r = it.toInt() }, valueRange = 0f..255f)
+                Text("Зелено: $g")
+                Slider(value = g.toFloat(), onValueChange = { g = it.toInt() }, valueRange = 0f..255f)
+                Text("Синьо: $b")
+                Slider(value = b.toFloat(), onValueChange = { b = it.toInt() }, valueRange = 0f..255f)
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onColorSelected(hexString) }) {
+                Text("Избери")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Отказ")
+            }
+        }
     )
 }
 
@@ -559,7 +733,7 @@ fun SettingsDialog(
     var appBg by remember { mutableStateOf(currentAppBg) }
     var contactsBg by remember { mutableStateOf(currentContactsBg) }
     var notesBg by remember { mutableStateOf(currentNotesBg) }
-    var tagsInput by remember { mutableStateOf(currentTags.joinToString(",")) }
+    var tagsInput by remember { mutableStateOf(currentTags.joinToString(", ")) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Настройки") },
@@ -568,21 +742,20 @@ fun SettingsDialog(
                 modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("Цветове (Hex или име):", fontWeight = FontWeight.Bold)
-                OutlinedTextField(
-                    value = appBg,
-                    onValueChange = { appBg = it },
-                    label = { Text("Фон на приложението") }
+                ColorSelectorRow(
+                    label = "Фон на приложението:",
+                    selectedColor = appBg,
+                    onColorSelected = { appBg = it }
                 )
-                OutlinedTextField(
-                    value = contactsBg,
-                    onValueChange = { contactsBg = it },
-                    label = { Text("Фон на панели Контакти") }
+                ColorSelectorRow(
+                    label = "Фон на панели Контакти:",
+                    selectedColor = contactsBg,
+                    onColorSelected = { contactsBg = it }
                 )
-                OutlinedTextField(
-                    value = notesBg,
-                    onValueChange = { notesBg = it },
-                    label = { Text("Фон на панели Бележки") }
+                ColorSelectorRow(
+                    label = "Фон на панели Бележки:",
+                    selectedColor = notesBg,
+                    onColorSelected = { notesBg = it }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Етикети (до 10, разделени със запетая):", fontWeight = FontWeight.Bold)
