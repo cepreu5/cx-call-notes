@@ -18,6 +18,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -25,6 +27,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.callnotes.CallNotesApp
 import com.example.callnotes.theme.CallNotesTheme
+
+fun parseColor(hex: String, default: Color): Color = try {
+    if (hex == "default") default else Color(android.graphics.Color.parseColor(hex))
+} catch (_: Exception) {
+    default
+}
 
 class PostCallNoteActivity : ComponentActivity() {
     private val viewModel: PostCallNoteViewModel by viewModels {
@@ -35,7 +43,11 @@ class PostCallNoteActivity : ComponentActivity() {
         val systemHandle = intent.getParcelableExtra<android.net.Uri>(android.telecom.TelecomManager.EXTRA_HANDLE)
         val phone = systemHandle?.schemeSpecificPart ?: intent.getStringExtra(EXTRA_PHONE) ?: ""
         val sessionId = intent.getLongExtra(EXTRA_SESSION_ID, -1).takeIf { it >= 0 }
-        viewModel.init(phone, sessionId)
+        val noteId = intent.getLongExtra(EXTRA_NOTE_ID, -1).takeIf { it >= 0 }
+        viewModel.init(phone, sessionId, noteId)
+        val prefs = getSharedPreferences("cx_call_notes_prefs", android.content.Context.MODE_PRIVATE)
+        val formBg = prefs.getString("form_bg_color", "default") ?: "default"
+        val fontCol = prefs.getString("font_color", "default") ?: "default"
         setContent {
             CallNotesTheme {
                 val state by viewModel.uiState.collectAsState()
@@ -44,11 +56,14 @@ class PostCallNoteActivity : ComponentActivity() {
                 }
                 PostCallNoteScreen(
                     state = state,
+                    formBgColor = formBg,
+                    fontColor = fontCol,
                     onPhoneChange = viewModel::updatePhoneNumber,
                     onCallerNameChange = viewModel::updateCallerName,
                     onNoteTextChange = viewModel::updateNoteText,
                     onTagToggle = viewModel::toggleTag,
                     onSave = viewModel::save,
+                    onUpdate = viewModel::updateNote,
                     onDismiss = { finish() }
                 )
             }
@@ -57,6 +72,7 @@ class PostCallNoteActivity : ComponentActivity() {
     companion object {
         const val EXTRA_PHONE = "extra_phone"
         const val EXTRA_SESSION_ID = "extra_session_id"
+        const val EXTRA_NOTE_ID = "extra_note_id"
     }
 }
 
@@ -64,20 +80,35 @@ class PostCallNoteActivity : ComponentActivity() {
 @Composable
 fun PostCallNoteScreen(
     state: PostCallNoteUiState,
+    formBgColor: String,
+    fontColor: String,
     onPhoneChange: (String) -> Unit,
     onCallerNameChange: (String) -> Unit,
     onNoteTextChange: (String) -> Unit,
     onTagToggle: (String) -> Unit,
     onSave: () -> Unit,
+    onUpdate: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
+    val defaultBg = MaterialTheme.colorScheme.background
+    val parsedBg = remember(formBgColor, defaultBg) {
+        if (formBgColor == "default") defaultBg else parseColor(formBgColor, defaultBg)
+    }
+    val defaultFont = MaterialTheme.colorScheme.onBackground
+    val parsedFont = remember(fontColor, defaultFont) {
+        if (fontColor == "default") defaultFont else parseColor(fontColor, defaultFont)
+    }
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.TopCenter
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .padding(16.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = parsedBg),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -90,7 +121,7 @@ fun PostCallNoteScreen(
                     text = if (state.isEditMode) "📝 Редактиране" else "📝 Нова бележка",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = parsedFont
                 )
                 Spacer(modifier = Modifier.height(10.dp))
                 if (state.isEditMode) {
@@ -111,8 +142,12 @@ fun PostCallNoteScreen(
                     OutlinedTextField(
                         value = state.phoneNumber,
                         onValueChange = onPhoneChange,
-                        label = { Text("Телефонен номер") },
+                        label = { Text("Телефон") },
                         singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = parsedFont,
+                            unfocusedTextColor = parsedFont
+                        ),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
@@ -123,6 +158,10 @@ fun PostCallNoteScreen(
                     onValueChange = onCallerNameChange,
                     label = { Text("Име") },
                     singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = parsedFont,
+                        unfocusedTextColor = parsedFont
+                    ),
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
@@ -132,10 +171,14 @@ fun PostCallNoteScreen(
                     onValueChange = onNoteTextChange,
                     label = { Text("Бележка") },
                     minLines = 3,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = parsedFont,
+                        unfocusedTextColor = parsedFont
+                    ),
                     trailingIcon = {
                         if (state.noteText.isNotEmpty()) {
                             IconButton(onClick = { onNoteTextChange("") }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Изчисти")
+                                Icon(Icons.Default.Clear, contentDescription = "Изчисти", tint = parsedFont)
                             }
                         }
                     },
@@ -146,6 +189,7 @@ fun PostCallNoteScreen(
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = "Етикети:",
+                        color = parsedFont,
                         style = MaterialTheme.typography.titleSmall,
                         modifier = Modifier.align(Alignment.Start)
                     )
@@ -173,12 +217,21 @@ fun PostCallNoteScreen(
                     ) {
                         Text("Отказ", maxLines = 1, softWrap = false)
                     }
+                    if (state.isEditMode) {
+                        Button(
+                            onClick = onUpdate,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Обнови", maxLines = 1, softWrap = false)
+                        }
+                    }
                     Button(
                         onClick = onSave,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Запази", maxLines = 1, softWrap = false)
+                        Text("Добави", maxLines = 1, softWrap = false)
                     }
                 }
             }

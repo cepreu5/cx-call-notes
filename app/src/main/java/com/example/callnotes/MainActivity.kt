@@ -70,10 +70,12 @@ class MainActivity : ComponentActivity() {
             CallNotesTheme {
                 val state by viewModel.state.collectAsState()
                 var showSettings by remember { mutableStateOf(false) }
+                var showFabMenu by remember { mutableStateOf(false) }
                 val defaultAppBg = MaterialTheme.colorScheme.background
                 val parsedAppBg = remember(state.appBgColor, defaultAppBg) {
                     if (state.appBgColor == "default") defaultAppBg else parseColor(state.appBgColor, Color(0xFFF5F5F5))
                 }
+                val context = androidx.compose.ui.platform.LocalContext.current
                 Scaffold(
                     modifier = Modifier.background(parsedAppBg),
                     containerColor = parsedAppBg,
@@ -85,14 +87,14 @@ class MainActivity : ComponentActivity() {
                                     Box(
                                         modifier = Modifier
                                             .size(36.dp)
-                                            .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
+                                            .background(Color(0xFFFF9800), CircleShape)
                                             .padding(6.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             Icons.Default.Call,
                                             contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
+                                            tint = Color.White,
                                             modifier = Modifier.fillMaxSize()
                                         )
                                     }
@@ -100,6 +102,7 @@ class MainActivity : ComponentActivity() {
                                     Text("CX Call Notes", fontWeight = FontWeight.Bold)
                                 }
                             },
+                            colors = TopAppBarDefaults.topAppBarColors(containerColor = parsedAppBg),
                             actions = {
                                 IconButton(onClick = {
                                     val intent = Intent(this@MainActivity, PostCallNoteActivity::class.java)
@@ -112,6 +115,83 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         )
+                    },
+                    floatingActionButton = {
+                        Box(contentAlignment = Alignment.BottomEnd) {
+                            if (showFabMenu) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .offset(x = (-80).dp, y = 0.dp)
+                                        .background(Color(0xFFE0E0E0), CircleShape)
+                                        .clickable {
+                                            showFabMenu = false
+                                            viewModel.selectTab(0)
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Person, contentDescription = "Контакти", modifier = Modifier.size(20.dp))
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .offset(x = (-69).dp, y = (-40).dp)
+                                        .background(Color(0xFFE0E0E0), CircleShape)
+                                        .clickable {
+                                            showFabMenu = false
+                                            viewModel.selectTab(1)
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Edit, contentDescription = "Бележки", modifier = Modifier.size(20.dp))
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .offset(x = (-40).dp, y = (-69).dp)
+                                        .background(Color(0xFFE0E0E0), CircleShape)
+                                        .clickable {
+                                            showFabMenu = false
+                                            showSettings = true
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Settings, contentDescription = "Настройки", modifier = Modifier.size(20.dp))
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .offset(x = 0.dp, y = (-80).dp)
+                                        .background(Color(0xFFE0E0E0), CircleShape)
+                                        .clickable {
+                                            showFabMenu = false
+                                            val intent = Intent(this@MainActivity, PostCallNoteActivity::class.java)
+                                            startActivity(intent)
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = "Добави бележка", modifier = Modifier.size(20.dp))
+                                }
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .background(MaterialTheme.colorScheme.error, CircleShape)
+                                    .combinedClickable(
+                                        onClick = {
+                                            if (showFabMenu) {
+                                                showFabMenu = false
+                                            } else {
+                                                (context as? android.app.Activity)?.moveTaskToBack(true)
+                                            }
+                                        },
+                                        onLongClick = { showFabMenu = !showFabMenu }
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Clear, contentDescription = "Минимизирай", tint = Color.White)
+                            }
+                        }
                     }
                 ) { padding ->
                     Box(modifier = Modifier.padding(padding)) {
@@ -132,7 +212,7 @@ class MainActivity : ComponentActivity() {
                             },
                             onEditNote = { note ->
                                 val intent = Intent(this@MainActivity, PostCallNoteActivity::class.java).apply {
-                                    putExtra(PostCallNoteActivity.EXTRA_PHONE, note.phoneNumber)
+                                    putExtra(PostCallNoteActivity.EXTRA_NOTE_ID, note.id)
                                 }
                                 startActivity(intent)
                             }
@@ -142,10 +222,15 @@ class MainActivity : ComponentActivity() {
                                 currentAppBg = state.appBgColor,
                                 currentContactsBg = state.contactsBgColor,
                                 currentNotesBg = state.notesBgColor,
+                                currentFontColor = state.fontColor,
+                                currentFormBgColor = state.formBgColor,
+                                currentThemePrimary = state.themePrimary,
+                                currentThemeSecondary = state.themeSecondary,
+                                currentThemeTertiary = state.themeTertiary,
                                 currentTags = state.tags,
                                 onDismiss = { showSettings = false },
-                                onSave = { appBg, contactsBg, notesBg, tags ->
-                                    viewModel.saveSettings(appBg, contactsBg, notesBg, tags)
+                                onSave = { appBg, contactsBg, notesBg, fontColor, formBg, themePrimary, themeSecondary, themeTertiary, tags ->
+                                    viewModel.saveSettings(appBg, contactsBg, notesBg, fontColor, formBg, themePrimary, themeSecondary, themeTertiary, tags)
                                     showSettings = false
                                 }
                             )
@@ -306,7 +391,7 @@ fun ContactsList(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(visibleContacts, key = { it.id }) { contact ->
                 SwipeToDeleteWrapper(appBgColor = appBgColor, onDelete = { onDelete(contact) }) {
@@ -342,7 +427,8 @@ fun ContactCard(
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onEdit(contact) },
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = cardBg)
+        colors = CardDefaults.cardColors(containerColor = cardBg),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -372,7 +458,17 @@ fun ContactCard(
             }
             if (!contact.note.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(4.dp))
-                WordSelectableText(contact.note, onSelectSearch)
+                Text(
+                    text = contact.note,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFF555555),
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.combinedClickable(
+                        onClick = { onEdit(contact) },
+                        onLongClick = { onSelectSearch(contact.note) }
+                    )
+                )
             }
             Spacer(modifier = Modifier.height(6.dp))
             Row(
@@ -439,7 +535,7 @@ fun NotesList(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(visibleNotes, key = { it.id }) { note ->
                 SwipeToDeleteWrapper(appBgColor = appBgColor, onDelete = { onDelete(note) }) {
@@ -474,7 +570,8 @@ fun NoteCard(
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onEdit(note) },
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = cardBg)
+        colors = CardDefaults.cardColors(containerColor = cardBg),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -606,14 +703,6 @@ fun ColorSelectorRow(
     selectedColor: String,
     onColorSelected: (String) -> Unit
 ) {
-    /*val presets = listOf(
-        "default" to Color(0xFF37474F),
-        "#121212" to Color(0xFF121212),
-        "#1A237E" to Color(0xFF1A237E),
-        "#1B5E20" to Color(0xFF1B5E20),
-        "#3E2723" to Color(0xFF3E2723),
-        "#004D40" to Color(0xFF004D40)
-    )*/
     val presets = listOf(
         "default" to Color(0xFF6ED3CF),
         "#C39BD3" to Color(0xFFC39BD3),
@@ -623,6 +712,9 @@ fun ColorSelectorRow(
         "#F5B67A" to Color(0xFFF5B67A),
     )
     var showPicker by remember { mutableStateOf(false) }
+    val currentSelectedBg = remember(selectedColor) {
+        if (selectedColor == "default") Color(0xFF6ED3CF) else parseColor(selectedColor, Color.Gray)
+    }
     Column {
         Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(4.dp))
@@ -630,6 +722,16 @@ fun ColorSelectorRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .background(currentSelectedBg, RoundedCornerShape(4.dp))
+                    .border(
+                        width = 3.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                        shape = RoundedCornerShape(4.dp)
+                    )
+            )
             presets.forEach { (code, color) ->
                 val isSelected = selectedColor == code
                 Box(
@@ -681,6 +783,7 @@ fun CustomColorPickerDialog(
     var r by remember { mutableStateOf(20) }
     var g by remember { mutableStateOf(20) }
     var b by remember { mutableStateOf(20) }
+    var hexInput by remember { mutableStateOf(initialColor) }
     LaunchedEffect(initialColor) {
         try {
             val parsed = android.graphics.Color.parseColor(initialColor)
@@ -706,13 +809,64 @@ fun CustomColorPickerDialog(
                         .border(1.dp, Color.Gray, RoundedCornerShape(8.dp))
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                Text("Код: $hexString", fontWeight = FontWeight.Bold)
-                Text("Червено: $r")
-                Slider(value = r.toFloat(), onValueChange = { r = it.toInt() }, valueRange = 0f..255f)
-                Text("Зелено: $g")
-                Slider(value = g.toFloat(), onValueChange = { g = it.toInt() }, valueRange = 0f..255f)
-                Text("Синьо: $b")
-                Slider(value = b.toFloat(), onValueChange = { b = it.toInt() }, valueRange = 0f..255f)
+                OutlinedTextField(
+                    value = hexInput,
+                    onValueChange = {
+                        hexInput = it
+                        if (it.length == 7 && it.startsWith("#")) {
+                            try {
+                                val p = android.graphics.Color.parseColor(it)
+                                r = android.graphics.Color.red(p)
+                                g = android.graphics.Color.green(p)
+                                b = android.graphics.Color.blue(p)
+                            } catch (_: java.lang.Exception) {}
+                        }
+                    },
+                    label = { Text("HEX код") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = r.toString(),
+                    onValueChange = {
+                        val v = it.toIntOrNull() ?: 0
+                        r = v.coerceIn(0, 255)
+                        hexInput = String.format("#%02X%02X%02X", r, g, b)
+                    },
+                    label = { Text("Червено (0-255)") },
+                    singleLine = true
+                )
+                Slider(value = r.toFloat(), onValueChange = {
+                    r = it.toInt()
+                    hexInput = String.format("#%02X%02X%02X", r, g, b)
+                }, valueRange = 0f..255f)
+                OutlinedTextField(
+                    value = g.toString(),
+                    onValueChange = {
+                        val v = it.toIntOrNull() ?: 0
+                        g = v.coerceIn(0, 255)
+                        hexInput = String.format("#%02X%02X%02X", r, g, b)
+                    },
+                    label = { Text("Зелено (0-255)") },
+                    singleLine = true
+                )
+                Slider(value = g.toFloat(), onValueChange = {
+                    g = it.toInt()
+                    hexInput = String.format("#%02X%02X%02X", r, g, b)
+                }, valueRange = 0f..255f)
+                OutlinedTextField(
+                    value = b.toString(),
+                    onValueChange = {
+                        val v = it.toIntOrNull() ?: 0
+                        b = v.coerceIn(0, 255)
+                        hexInput = String.format("#%02X%02X%02X", r, g, b)
+                    },
+                    label = { Text("Синьо (0-255)") },
+                    singleLine = true
+                )
+                Slider(value = b.toFloat(), onValueChange = {
+                    b = it.toInt()
+                    hexInput = String.format("#%02X%02X%02X", r, g, b)
+                }, valueRange = 0f..255f)
             }
         },
         confirmButton = {
@@ -734,13 +888,23 @@ fun SettingsDialog(
     currentAppBg: String,
     currentContactsBg: String,
     currentNotesBg: String,
+    currentFontColor: String,
+    currentFormBgColor: String,
+    currentThemePrimary: String,
+    currentThemeSecondary: String,
+    currentThemeTertiary: String,
     currentTags: List<String>,
     onDismiss: () -> Unit,
-    onSave: (String, String, String, List<String>) -> Unit
+    onSave: (String, String, String, String, String, String, String, String, List<String>) -> Unit
 ) {
     var appBg by remember { mutableStateOf(currentAppBg) }
     var contactsBg by remember { mutableStateOf(currentContactsBg) }
     var notesBg by remember { mutableStateOf(currentNotesBg) }
+    var fontColor by remember { mutableStateOf(currentFontColor) }
+    var formBgColor by remember { mutableStateOf(currentFormBgColor) }
+    var themePrimary by remember { mutableStateOf(currentThemePrimary) }
+    var themeSecondary by remember { mutableStateOf(currentThemeSecondary) }
+    var themeTertiary by remember { mutableStateOf(currentThemeTertiary) }
     var tagsInput by remember { mutableStateOf(currentTags.joinToString(", ")) }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -765,8 +929,33 @@ fun SettingsDialog(
                     selectedColor = notesBg,
                     onColorSelected = { notesBg = it }
                 )
+                ColorSelectorRow(
+                    label = "Фон на форми и настройки:",
+                    selectedColor = formBgColor,
+                    onColorSelected = { formBgColor = it }
+                )
+                ColorSelectorRow(
+                    label = "Цвят на шрифт на форми:",
+                    selectedColor = fontColor,
+                    onColorSelected = { fontColor = it }
+                )
+                ColorSelectorRow(
+                    label = "Основен цвят на темата (Primary):",
+                    selectedColor = themePrimary,
+                    onColorSelected = { themePrimary = it }
+                )
+                ColorSelectorRow(
+                    label = "Вторичен цвят на темата (Secondary):",
+                    selectedColor = themeSecondary,
+                    onColorSelected = { themeSecondary = it }
+                )
+                ColorSelectorRow(
+                    label = "Третичен цвят на темата (Tertiary):",
+                    selectedColor = themeTertiary,
+                    onColorSelected = { themeTertiary = it }
+                )
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("Етикети (до 10, разделени със запетая):", fontWeight = FontWeight.Bold)
+                Text("Етикети (до 20, разделени със запетая):", fontWeight = FontWeight.Bold)
                 OutlinedTextField(
                     value = tagsInput,
                     onValueChange = { tagsInput = it },
@@ -776,8 +965,8 @@ fun SettingsDialog(
         },
         confirmButton = {
             Button(onClick = {
-                val tagsList = tagsInput.split(",").map { it.trim() }.filter { it.isNotEmpty() }.take(10)
-                onSave(appBg, contactsBg, notesBg, tagsList)
+                val tagsList = tagsInput.split(",").map { it.trim() }.filter { it.isNotEmpty() }.take(20)
+                onSave(appBg, contactsBg, notesBg, fontColor, formBgColor, themePrimary, themeSecondary, themeTertiary, tagsList)
             }) {
                 Text("Запази")
             }

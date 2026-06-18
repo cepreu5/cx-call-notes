@@ -24,12 +24,13 @@ class OverlayService : Service() {
         Log.d("CXCalls", "OverlayService onStartCommand")
         val name = intent?.getStringExtra(EXTRA_NAME) ?: "Unknown"
         val note = intent?.getStringExtra(EXTRA_NOTE) ?: ""
-        Log.d("CXCalls", "OverlayService: name=$name, note=$note")
-        showOverlay(name, note)
+        val tags = intent?.getStringExtra(EXTRA_TAGS) ?: ""
+        Log.d("CXCalls", "OverlayService: name=$name, note=$note, tags=$tags")
+        showOverlay(name, note, tags)
         return START_NOT_STICKY
     }
     @SuppressLint("InflateParams")
-    private fun showOverlay(name: String, note: String) {
+    private fun showOverlay(name: String, note: String, tags: String) {
         Log.d("CXCalls", "showOverlay: canDrawOverlays=${android.provider.Settings.canDrawOverlays(this)}")
         if (!android.provider.Settings.canDrawOverlays(this)) {
             Log.e("CXCalls", "OVERLAY PERMISSION NOT GRANTED - cannot show overlay")
@@ -45,9 +46,16 @@ class OverlayService : Service() {
         overlayView = inflater.inflate(R.layout.overlay_note, null)
         val tvName = overlayView?.findViewById<TextView>(R.id.tv_caller_name)
         val tvNote = overlayView?.findViewById<TextView>(R.id.tv_caller_note)
+        val tvTags = overlayView?.findViewById<TextView>(R.id.tv_caller_tags)
         val btnClose = overlayView?.findViewById<Button>(R.id.btn_close_overlay)
         tvName?.text = name
         tvNote?.text = note.ifBlank { "Няма бележки за този контакт." }
+        if (tags.isNotBlank()) {
+            tvTags?.visibility = View.VISIBLE
+            tvTags?.text = "Етикети: $tags"
+        } else {
+            tvTags?.visibility = View.GONE
+        }
         btnClose?.setOnClickListener { stopSelf() }
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -78,6 +86,7 @@ class OverlayService : Service() {
     companion object {
         const val EXTRA_NAME = "extra_name"
         const val EXTRA_NOTE = "extra_note"
+        const val EXTRA_TAGS = "extra_tags"
     }
 }
 

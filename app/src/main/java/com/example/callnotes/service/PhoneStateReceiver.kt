@@ -43,6 +43,7 @@ class PhoneStateReceiver : BroadcastReceiver() {
                                 val overlayIntent = Intent(context.applicationContext, OverlayService::class.java).apply {
                                     putExtra(OverlayService.EXTRA_NAME, contact.displayName)
                                     putExtra(OverlayService.EXTRA_NOTE, contact.note ?: "")
+                                    putExtra(OverlayService.EXTRA_TAGS, contact.tags ?: "")
                                 }
                                 context.applicationContext.startService(overlayIntent)
                             }
@@ -60,6 +61,13 @@ class PhoneStateReceiver : BroadcastReceiver() {
                 if (wasRinging && incomingNumber != null) {
                     Log.d("CXCalls", "PhoneStateReceiver: IDLE after call, launching PostCallNoteActivity")
                     val phone = PhoneNumberNormalizer.normalize(incomingNumber!!)
+                    val prefs = context.getSharedPreferences("cx_call_notes_prefs", Context.MODE_PRIVATE)
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val db = DatabaseProvider.get(context.applicationContext)
+                        val contact = db.contactDao().findByPhone(phone)
+                        val name = contact?.displayName ?: ""
+                        prefs.edit().putString("last_call_phone", phone).putString("last_call_name", name).apply()
+                    }
                     try {
                         context.applicationContext.stopService(Intent(context.applicationContext, OverlayService::class.java))
                     } catch (_: Exception) {}

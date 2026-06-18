@@ -8,7 +8,7 @@ class CallNotesRepository(private val db: AppDatabase) {
     suspend fun getAllContacts() = db.contactDao().getAll()
     fun getAllContactsFlow(): Flow<List<ContactEntity>> = db.contactDao().getAllFlow()
     suspend fun getAllNotes() = db.callNoteDao().getAll()
-    fun getAllNotesFlow(): Flow<List<CallNoteEntity>> = db.callNoteDao().getAllFlow()
+    suspend fun findNote(id: Long) = db.callNoteDao().findById(id)
     suspend fun searchContacts(query: String) = db.contactDao().search(query)
     suspend fun searchNotes(query: String) = db.callNoteDao().search(query)
     suspend fun createSession(phone: String, known: ContactEntity?) =
@@ -36,6 +36,7 @@ class CallNotesRepository(private val db: AppDatabase) {
             callSessionId = sessionId
         )
     )
+    suspend fun updateNoteEntity(note: CallNoteEntity) = db.callNoteDao().update(note)
     suspend fun deleteContact(contact: ContactEntity) = db.contactDao().delete(contact)
     suspend fun deleteNote(note: CallNoteEntity) = db.callNoteDao().delete(note)
 }

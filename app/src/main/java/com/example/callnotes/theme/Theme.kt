@@ -8,6 +8,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 /*
@@ -152,6 +153,31 @@ private val LightColorScheme =
 fun CallNotesTheme(
   content: @Composable () -> Unit,
 ) {
-  MaterialTheme(colorScheme = LightColorScheme, typography = Typography, content = content)
+  val context = LocalContext.current
+  val prefs = remember { context.getSharedPreferences("cx_call_notes_prefs", android.content.Context.MODE_PRIVATE) }
+  val primaryHex = prefs.getString("theme_primary", "default") ?: "default"
+  val secondaryHex = prefs.getString("theme_secondary", "default") ?: "default"
+  val tertiaryHex = prefs.getString("theme_tertiary", "default") ?: "default"
+  val parsedPrimary = try {
+    if (primaryHex == "default") LightColorScheme.primary else Color(android.graphics.Color.parseColor(primaryHex))
+  } catch (_: Exception) {
+    LightColorScheme.primary
+  }
+  val parsedSecondary = try {
+    if (secondaryHex == "default") LightColorScheme.secondary else Color(android.graphics.Color.parseColor(secondaryHex))
+  } catch (_: Exception) {
+    LightColorScheme.secondary
+  }
+  val parsedTertiary = try {
+    if (tertiaryHex == "default") LightColorScheme.tertiary else Color(android.graphics.Color.parseColor(tertiaryHex))
+  } catch (_: Exception) {
+    LightColorScheme.tertiary
+  }
+  val dynamicScheme = LightColorScheme.copy(
+    primary = parsedPrimary,
+    secondary = parsedSecondary,
+    tertiary = parsedTertiary
+  )
+  MaterialTheme(colorScheme = dynamicScheme, typography = Typography, content = content)
 }
 

@@ -24,6 +24,13 @@ data class MainUiState(
     val appBgColor: String = "#FFFFFF",
     val contactsBgColor: String = "#FFFFFF",
     val notesBgColor: String = "#E8F5E9",
+    val fontColor: String = "default",
+    val formBgColor: String = "default",
+    val lastCallPhone: String = "",
+    val lastCallName: String = "",
+    val themePrimary: String = "default",
+    val themeSecondary: String = "default",
+    val themeTertiary: String = "default",
     val tags: List<String> = emptyList()
 )
 
@@ -42,21 +49,48 @@ class MainViewModel(
         val appBg = prefs.getString("app_bg_color", "default") ?: "default"
         val contactsBg = prefs.getString("contacts_bg_color", "default") ?: "default"
         val notesBg = prefs.getString("notes_bg_color", "default") ?: "default"
+        val fontCol = prefs.getString("font_color", "default") ?: "default"
+        val formBg = prefs.getString("form_bg_color", "default") ?: "default"
+        val lastPhone = prefs.getString("last_call_phone", "") ?: ""
+        val lastName = prefs.getString("last_call_name", "") ?: ""
+        val primaryCol = prefs.getString("theme_primary", "default") ?: "default"
+        val secondaryCol = prefs.getString("theme_secondary", "default") ?: "default"
+        val tertiaryCol = prefs.getString("theme_tertiary", "default") ?: "default"
         val tagsStr = prefs.getString("tags_list", "Клиент,Важно,Партньор,Доставчик,Лично") ?: "Клиент,Важно,Партньор,Доставчик,Лично"
         val tagsList = tagsStr.split(",").filter { it.isNotBlank() }
         _state.value = _state.value.copy(
             appBgColor = appBg,
             contactsBgColor = contactsBg,
             notesBgColor = notesBg,
+            fontColor = fontCol,
+            formBgColor = formBg,
+            lastCallPhone = lastPhone,
+            lastCallName = lastName,
+            themePrimary = primaryCol,
+            themeSecondary = secondaryCol,
+            themeTertiary = tertiaryCol,
             tags = tagsList
         )
     }
-    fun saveSettings(appBg: String, contactsBg: String, notesBg: String, tagsList: List<String>) {
+    fun saveSettings(appBg: String, contactsBg: String, notesBg: String, fontCol: String, formBg: String, primaryCol: String, secondaryCol: String, tertiaryCol: String, tagsList: List<String>) {
         prefs.edit().apply {
             putString("app_bg_color", appBg)
             putString("contacts_bg_color", contactsBg)
             putString("notes_bg_color", notesBg)
+            putString("font_color", fontCol)
+            putString("form_bg_color", formBg)
+            putString("theme_primary", primaryCol)
+            putString("theme_secondary", secondaryCol)
+            putString("theme_tertiary", tertiaryCol)
             putString("tags_list", tagsList.joinToString(","))
+            apply()
+        }
+        loadSettings()
+    }
+    fun saveLastCall(phone: String, name: String) {
+        prefs.edit().apply {
+            putString("last_call_phone", phone)
+            putString("last_call_name", name)
             apply()
         }
         loadSettings()

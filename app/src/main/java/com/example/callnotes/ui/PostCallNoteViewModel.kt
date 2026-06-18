@@ -15,6 +15,7 @@ data class PostCallNoteUiState(
     val callerName: String = "",
     val noteText: String = "",
     val sessionId: Long? = null,
+    val noteId: Long? = null,
     val selectedTags: Set<String> = emptySet(),
     val availableTags: List<String> = emptyList(),
     val saved: Boolean = false,
@@ -28,17 +29,42 @@ class PostCallNoteViewModel(
     private val _uiState = MutableStateFlow(PostCallNoteUiState())
     val uiState: StateFlow<PostCallNoteUiState> = _uiState
     private val prefs = context.getSharedPreferences("cx_call_notes_prefs", Context.MODE_PRIVATE)
-    fun init(phone: String, sessionId: Long? = null) {
+    fun init(phone: String, sessionId: Long? = null, noteId: Long? = null) {
         val tagsStr = prefs.getString("tags_list", "Клиент,Важно,Партньор,Доставчик,Лично") ?: "Клиент,Важно,Партньор,Доставчик,Лично"
         val availableTags = tagsStr.split(",").map { it.trim() }.filter { it.isNotBlank() }
+        var finalPhone = phone
+        var finalName = ""
+        if (finalPhone.isBlank() && noteId == null) {
+            finalPhone = prefs.getString("last_call_phone", "") ?: ""
+            finalName = prefs.getString("last_call_name", "") ?: ""
+        }
         _uiState.value = _uiState.value.copy(
-            phoneNumber = phone,
+            phoneNumber = finalPhone,
+            callerName = finalName,
             sessionId = sessionId,
+            noteId = noteId,
             availableTags = availableTags
         )
-        if (phone.isNotBlank()) {
+        if (noteId != null) {
             viewModelScope.launch {
-                val contact = repository.findContact(phone)
+                val note = repository.findNote(noteId)
+                if (note != null) {
+                    _uiState.value = _uiState.value.copy(
+                        phoneNumber = note.phoneNumber,
+                        callerName = note.callerName ?: "",
+                        noteText = note.noteText,
+                        isEditMode = true
+                    )
+                    val contact = repository.findContact(note.phoneNumber)
+                    if (contact != null) {
+                        val selected = contact.tags?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+                        _uiState.value = _uiState.value.copy(selectedTags = selected)
+                    }
+                }
+            }
+        } else if (finalPhone.isNotBlank()) {
+            viewModelScope.launch {
+                val contact = repository.findContact(finalPhone)
                 if (contact != null) {
                     val selected = contact.tags?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
                     _uiState.value = _uiState.value.copy(
@@ -48,7 +74,7 @@ class PostCallNoteViewModel(
                         isEditMode = true
                     )
                 } else {
-                    val systemName = getNameFromPhoneContacts(phone) ?: ""
+                    val systemName = getNameFromPhoneContacts(finalPhone) ?: ""
                     if (systemName.isNotBlank()) {
                         _uiState.value = _uiState.value.copy(callerName = systemName)
                     }
@@ -92,6 +118,36 @@ class PostCallNoteViewModel(
             val s = _uiState.value
             val normPhone = com.example.callnotes.data.PhoneNumberNormalizer.normalize(s.phoneNumber)
             repository.saveNote(normPhone, s.callerName.ifBlank { null }, s.noteText, s.sessionId)
+            if (s.callerName.isNotBlank()) {
+                val tagsStr = s.selectedTags.joinToString(",")
+                repository.saveContact(
+                    ContactEntity(
+                        phoneNumber = normPhone,
+                        displayName = s.callerName,
+                        note = s.noteText,
+                        tags = tagsStr
+                    )
+                )
+            }
+            _uiState.value = s.copy(saved = true)
+        }
+    }
+    fun updateNote() {
+        viewModelScope.launch {
+            val s = _uiState.value
+            val normPhone = com.example.callnotes.data.PhoneNumberNormalizer.normalize(s.phoneNumber)
+            if (s.noteId != null) {
+                val existing = repository.findNote(s.noteId)
+                if (existing != null) {
+                    repository.updateNoteEntity(
+                        existing.copy(
+                            phoneNumber = normPhone,
+                            callerName = s.callerName.ifBlank { null },
+                            noteText = s.noteText
+                        )
+                    )
+                }
+            }
             if (s.callerName.isNotBlank()) {
                 val tagsStr = s.selectedTags.joinToString(",")
                 repository.saveContact(
