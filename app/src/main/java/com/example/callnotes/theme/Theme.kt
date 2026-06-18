@@ -79,7 +79,7 @@ private val DarkColorScheme =
         onBackground = Color(0xFFE1E3E3),
         onSurface = Color(0xFFE1E3E3),
     )
-*/
+
 private val DarkColorScheme =
     darkColorScheme(
         primary = Color(0xFFFF8C42),          // ярко оранжево за тъмна тема
@@ -101,10 +101,57 @@ private val DarkColorScheme =
         secondaryContainer = Color(0xFF5A3A1F),  // тъмен оранжев контейнер
     )
 
+private val DarkColorScheme =
+    darkColorScheme(
+        primary = Color(0xFFFFB3D6),          // светло пастелно розово
+        onPrimary = Color(0xFF3A1F28),
+
+        secondary = Color(0xFFCCE9FF),        // светло пастелно синьо
+        onSecondary = Color(0xFF1A2630),
+
+        tertiary = Color(0xFFD4F8D2),         // светла мента
+        onTertiary = Color(0xFF1A2E1A),
+
+        background = Color(0xFF2A242A),       // тъмен лилаво‑сив фон (не черен)
+        onBackground = Color(0xFFF3EDF2),
+
+        surface = Color(0xFF332D33),          // тъмен, но мек surface
+        onSurface = Color(0xFFF3EDF2),
+
+        surfaceContainerLow = Color(0xFF3C353C), // леко повдигнат слой
+        secondaryContainer = Color(0xFF2F3E4A),  // тъмен син контейнер
+    )
+*/
+
+private val LightColorScheme =
+    lightColorScheme(
+        primary = Color(0xFFF7A8B8),          // розово бонбон
+        onPrimary = Color(0xFF3A1F25),
+
+        secondary = Color(0xFF6ED3CF),        // тюркоаз
+        onSecondary = Color(0xFF123233),
+
+        tertiary = Color(0xFFC39BD3),         // лилаво
+        onTertiary = Color(0xFF2E1F33),
+
+        background = Color(0xFFF5F5F2),       // пастелен фон
+        onBackground = Color(0xFF2A2A28),
+
+        surface = Color(0xFFFFFFFF),          // бял surface
+        onSurface = Color(0xFF2A2A28),
+
+        surfaceContainerLow = Color(0xFFECECE8), // леко сивкав слой
+
+        // Допълнителни пастелни панели
+        primaryContainer = Color(0xFFF9E79F), // жълто
+        secondaryContainer = Color(0xFFABE188), // лайм зелено
+        tertiaryContainer = Color(0xFFF5B67A), // оранжево
+    )
+
 @Composable
 fun CallNotesTheme(
   content: @Composable () -> Unit,
 ) {
-  MaterialTheme(colorScheme = DarkColorScheme, typography = Typography, content = content)
+  MaterialTheme(colorScheme = LightColorScheme, typography = Typography, content = content)
 }
 

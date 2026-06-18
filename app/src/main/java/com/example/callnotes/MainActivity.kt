@@ -606,13 +606,21 @@ fun ColorSelectorRow(
     selectedColor: String,
     onColorSelected: (String) -> Unit
 ) {
-    val presets = listOf(
+    /*val presets = listOf(
         "default" to Color(0xFF37474F),
         "#121212" to Color(0xFF121212),
         "#1A237E" to Color(0xFF1A237E),
         "#1B5E20" to Color(0xFF1B5E20),
         "#3E2723" to Color(0xFF3E2723),
         "#004D40" to Color(0xFF004D40)
+    )*/
+    val presets = listOf(
+        "default" to Color(0xFF6ED3CF),
+        "#C39BD3" to Color(0xFFC39BD3),
+        "#F9E79F" to Color(0xFFF9E79F),
+        "#ABE188" to Color(0xFFABE188),
+        "#F7A8B8" to Color(0xFFF7A8B8),
+        "#F5B67A" to Color(0xFFF5B67A),
     )
     var showPicker by remember { mutableStateOf(false) }
     Column {
