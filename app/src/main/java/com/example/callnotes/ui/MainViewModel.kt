@@ -31,7 +31,9 @@ data class MainUiState(
     val themePrimary: String = "default",
     val themeSecondary: String = "default",
     val themeTertiary: String = "default",
-    val tags: List<String> = emptyList()
+    val tags: List<String> = emptyList(),
+    val fabX: Int = -1,
+    val fabY: Int = -1
 )
 
 class MainViewModel(
@@ -58,6 +60,8 @@ class MainViewModel(
         val tertiaryCol = prefs.getString("theme_tertiary", "default") ?: "default"
         val tagsStr = prefs.getString("tags_list", "Клиент,Важно,Партньор,Доставчик,Лично") ?: "Клиент,Важно,Партньор,Доставчик,Лично"
         val tagsList = tagsStr.split(",").filter { it.isNotBlank() }
+        val fabX = prefs.getInt("fab_x", -1)
+        val fabY = prefs.getInt("fab_y", -1)
         _state.value = _state.value.copy(
             appBgColor = appBg,
             contactsBgColor = contactsBg,
@@ -69,7 +73,9 @@ class MainViewModel(
             themePrimary = primaryCol,
             themeSecondary = secondaryCol,
             themeTertiary = tertiaryCol,
-            tags = tagsList
+            tags = tagsList,
+            fabX = fabX,
+            fabY = fabY
         )
     }
     fun saveSettings(appBg: String, contactsBg: String, notesBg: String, fontCol: String, formBg: String, primaryCol: String, secondaryCol: String, tertiaryCol: String, tagsList: List<String>) {
@@ -94,6 +100,14 @@ class MainViewModel(
             apply()
         }
         loadSettings()
+    }
+    fun saveFabPosition(x: Int, y: Int) {
+        prefs.edit().apply {
+            putInt("fab_x", x)
+            putInt("fab_y", y)
+            apply()
+        }
+        _state.value = _state.value.copy(fabX = x, fabY = y)
     }
     fun load() {
         viewModelScope.launch {

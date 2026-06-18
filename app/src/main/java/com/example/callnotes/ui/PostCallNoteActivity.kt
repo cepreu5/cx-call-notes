@@ -213,7 +213,8 @@ fun PostCallNoteScreen(
                     OutlinedButton(
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
                     ) {
                         Text("Отказ", maxLines = 1, softWrap = false)
                     }
@@ -221,7 +222,8 @@ fun PostCallNoteScreen(
                         Button(
                             onClick = onUpdate,
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
                         ) {
                             Text("Обнови", maxLines = 1, softWrap = false)
                         }
@@ -229,7 +231,8 @@ fun PostCallNoteScreen(
                     Button(
                         onClick = onSave,
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
                     ) {
                         Text("Добави", maxLines = 1, softWrap = false)
                     }

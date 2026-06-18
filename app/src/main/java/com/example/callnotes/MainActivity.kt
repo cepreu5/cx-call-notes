@@ -15,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -35,7 +36,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.example.callnotes.data.CallNoteEntity
@@ -117,12 +121,83 @@ class MainActivity : ComponentActivity() {
                         )
                     },
                     floatingActionButton = {
-                        Box(contentAlignment = Alignment.BottomEnd) {
+                        val density = LocalDensity.current
+                        val fabSizeDp = 56.dp
+                        val fabSizePx = with(density) { fabSizeDp.toPx() }
+                        val menuIconSizeDp = 36.dp
+                        val menuIconSizePx = with(density) { menuIconSizeDp.toPx() }
+                        val menuRadiusPx = with(density) { 80.dp.toPx() }
+                        val iconHalfPx = menuIconSizePx / 2f
+                        val fabHalfPx = fabSizePx / 2f
+                        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                            val parentWidthPx = constraints.maxWidth.toFloat()
+                            val parentHeightPx = constraints.maxHeight.toFloat()
+                            val maxX = (parentWidthPx - fabSizePx).coerceAtLeast(0f)
+                            val maxY = (parentHeightPx - fabSizePx).coerceAtLeast(0f)
+                            val initialX = if (state.fabX < 0) maxX else state.fabX.toFloat().coerceIn(0f, maxX)
+                            val initialY = if (state.fabY < 0) maxY else state.fabY.toFloat().coerceIn(0f, maxY)
+                            var fabXState by remember(parentWidthPx, parentHeightPx) { mutableFloatStateOf(initialX) }
+                            var fabYState by remember(parentWidthPx, parentHeightPx) { mutableFloatStateOf(initialY) }
+                            val fabCenterX = fabXState + fabHalfPx
+                            val fabCenterY = fabYState + fabHalfPx
+                            val isRight = fabCenterX >= parentWidthPx / 2f
+                            val isBottom = fabCenterY >= parentHeightPx / 2f
+                            val inwardX = if (isRight) -1f else 1f
+                            val inwardY = if (isBottom) -1f else 1f
+                            val r = menuRadiusPx
+                            val topMargin = fabCenterY
+                            val bottomMargin = parentHeightPx - fabCenterY
+                            val neededClearance = r + menuIconSizePx
+                            val isNearTopEdge = topMargin < neededClearance
+                            val isNearBottomEdge = bottomMargin < neededClearance
+                            val useCornerArc = isNearTopEdge || isNearBottomEdge
+                            val outer = inwardX
+                            val sign = inwardY
+                            data class IconSlot(val dx: Float, val dy: Float)
+                            val slots: List<IconSlot> = when {
+                                useCornerArc -> {
+                                    val c30 = 0.866f
+                                    val s30 = 0.5f
+                                    val c60 = 0.5f
+                                    val s60 = 0.866f
+                                    listOf(
+                                        IconSlot(dx = outer * r, dy = 0f),
+                                        IconSlot(dx = outer * (r * c60), dy = sign * (r * s60)),
+                                        IconSlot(dx = outer * (r * s60), dy = sign * (r * c60)),
+                                        IconSlot(dx = 0f, dy = sign * r)
+                                    )
+                                }
+                                else -> {
+                                    val s90 = 1f
+                                    val c90 = 0f
+                                    val s120 = 0.866f
+                                    val c120 = 0.5f
+                                    val s150 = 0.5f
+                                    val c150 = 0.866f
+                                    val s180 = 0f
+                                    val c180 = 1f
+                                    listOf(
+                                        IconSlot(dx = outer * (r * c90), dy = sign * (r * s90)),
+                                        IconSlot(dx = outer * (r * c120), dy = sign * (r * s120)),
+                                        IconSlot(dx = outer * (r * c150), dy = sign * (r * s150)),
+                                        IconSlot(dx = outer * (r * c180), dy = sign * (r * s180))
+                                    )
+                                }
+                            }
+                            val slot0 = slots[0]
+                            val slot1 = slots[1]
+                            val slot2 = slots[2]
+                            val slot3 = slots[3]
                             if (showFabMenu) {
                                 Box(
                                     modifier = Modifier
-                                        .size(36.dp)
-                                        .offset(x = (-80).dp, y = 0.dp)
+                                        .size(menuIconSizeDp)
+                                        .offset {
+                                            IntOffset(
+                                                (fabXState + (fabSizePx - menuIconSizePx) / 2f + slot0.dx).toInt(),
+                                                (fabYState + (fabSizePx - menuIconSizePx) / 2f + slot0.dy).toInt()
+                                            )
+                                        }
                                         .background(Color(0xFFE0E0E0), CircleShape)
                                         .clickable {
                                             showFabMenu = false
@@ -134,8 +209,13 @@ class MainActivity : ComponentActivity() {
                                 }
                                 Box(
                                     modifier = Modifier
-                                        .size(36.dp)
-                                        .offset(x = (-69).dp, y = (-40).dp)
+                                        .size(menuIconSizeDp)
+                                        .offset {
+                                            IntOffset(
+                                                (fabXState + (fabSizePx - menuIconSizePx) / 2f + slot1.dx).toInt(),
+                                                (fabYState + (fabSizePx - menuIconSizePx) / 2f + slot1.dy).toInt()
+                                            )
+                                        }
                                         .background(Color(0xFFE0E0E0), CircleShape)
                                         .clickable {
                                             showFabMenu = false
@@ -147,8 +227,13 @@ class MainActivity : ComponentActivity() {
                                 }
                                 Box(
                                     modifier = Modifier
-                                        .size(36.dp)
-                                        .offset(x = (-40).dp, y = (-69).dp)
+                                        .size(menuIconSizeDp)
+                                        .offset {
+                                            IntOffset(
+                                                (fabXState + (fabSizePx - menuIconSizePx) / 2f + slot2.dx).toInt(),
+                                                (fabYState + (fabSizePx - menuIconSizePx) / 2f + slot2.dy).toInt()
+                                            )
+                                        }
                                         .background(Color(0xFFE0E0E0), CircleShape)
                                         .clickable {
                                             showFabMenu = false
@@ -160,8 +245,13 @@ class MainActivity : ComponentActivity() {
                                 }
                                 Box(
                                     modifier = Modifier
-                                        .size(36.dp)
-                                        .offset(x = 0.dp, y = (-80).dp)
+                                        .size(menuIconSizeDp)
+                                        .offset {
+                                            IntOffset(
+                                                (fabXState + (fabSizePx - menuIconSizePx) / 2f + slot3.dx).toInt(),
+                                                (fabYState + (fabSizePx - menuIconSizePx) / 2f + slot3.dy).toInt()
+                                            )
+                                        }
                                         .background(Color(0xFFE0E0E0), CircleShape)
                                         .clickable {
                                             showFabMenu = false
@@ -175,21 +265,31 @@ class MainActivity : ComponentActivity() {
                             }
                             Box(
                                 modifier = Modifier
-                                    .size(56.dp)
+                                    .offset { IntOffset(fabXState.toInt(), fabYState.toInt()) }
+                                    .size(fabSizeDp)
                                     .background(MaterialTheme.colorScheme.error, CircleShape)
-                                    .combinedClickable(
-                                        onClick = {
-                                            if (showFabMenu) {
-                                                showFabMenu = false
-                                            } else {
-                                                (context as? android.app.Activity)?.moveTaskToBack(true)
+                                    .pointerInput(showFabMenu) {
+                                        if (!showFabMenu) {
+                                            detectDragGestures(
+                                                onDragEnd = {
+                                                    viewModel.saveFabPosition(fabXState.toInt(), fabYState.toInt())
+                                                }
+                                            ) { change, dragAmount ->
+                                                change.consume()
+                                                fabXState = (fabXState + dragAmount.x).coerceIn(0f, maxX)
+                                                fabYState = (fabYState + dragAmount.y).coerceIn(0f, maxY)
                                             }
-                                        },
-                                        onLongClick = { showFabMenu = !showFabMenu }
+                                        }
+                                    }
+                                    .combinedClickable(
+                                        onClick = { showFabMenu = !showFabMenu },
+                                        onLongClick = {
+                                            (context as? android.app.Activity)?.moveTaskToBack(true)
+                                        }
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.Clear, contentDescription = "Минимизирай", tint = Color.White)
+                                Icon(Icons.Default.Clear, contentDescription = "Меню", tint = Color.White)
                             }
                         }
                     }
@@ -440,7 +540,7 @@ fun ContactCard(
                     text = contact.displayName,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF333333),
+                    color = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.combinedClickable(
                         onClick = { onEdit(contact) },
                         onLongClick = { onSelectSearch(contact.displayName) }
@@ -461,7 +561,7 @@ fun ContactCard(
                 Text(
                     text = contact.note,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF555555),
+                    color = MaterialTheme.colorScheme.secondary,
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     modifier = Modifier.combinedClickable(
@@ -704,7 +804,6 @@ fun ColorSelectorRow(
     onColorSelected: (String) -> Unit
 ) {
     val presets = listOf(
-        "default" to Color(0xFF6ED3CF),
         "#C39BD3" to Color(0xFFC39BD3),
         "#F9E79F" to Color(0xFFF9E79F),
         "#ABE188" to Color(0xFFABE188),
