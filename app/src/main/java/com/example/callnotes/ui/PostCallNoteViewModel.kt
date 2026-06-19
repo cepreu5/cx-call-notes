@@ -18,7 +18,8 @@ data class PostCallNoteUiState(
     val selectedTags: Set<String> = emptySet(),
     val availableTags: List<String> = emptyList(),
     val saved: Boolean = false,
-    val isEditMode: Boolean = false
+    val isEditMode: Boolean = false,
+    val isNewContact: Boolean = false
 )
 
 class PostCallNoteViewModel(
@@ -76,6 +77,7 @@ class PostCallNoteViewModel(
                     if (systemName.isNotBlank()) {
                         _uiState.value = _uiState.value.copy(callerName = systemName)
                     }
+                    _uiState.value = _uiState.value.copy(isNewContact = true)
                 }
             }
         }

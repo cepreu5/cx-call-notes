@@ -82,10 +82,18 @@ class MainActivity : ComponentActivity() {
                 var showSettings by remember { mutableStateOf(false) }
                 var showFabMenu by remember { mutableStateOf(false) }
                 var showPostCallNote by remember { mutableStateOf(false) }
+                var shouldMinimize by remember { mutableStateOf(false) }
+                var fromCall by remember { mutableStateOf(false) }
                 val noteState by noteViewModel.uiState.collectAsState()
                 val prefs = remember { getSharedPreferences("cx_call_notes_prefs", Context.MODE_PRIVATE) }
                 val formBg = remember { prefs.getString("form_bg_color", "default") ?: "default" }
                 val fontCol = remember { prefs.getString("font_color", "default") ?: "default" }
+                LaunchedEffect(shouldMinimize) {
+                    if (shouldMinimize) {
+                        shouldMinimize = false
+                        this@MainActivity.moveTaskToBack(true)
+                    }
+                }
                 val defaultAppBg = MaterialTheme.colorScheme.background
                 val parsedAppBg = remember(state.appBgColor, defaultAppBg) {
                     if (state.appBgColor == "default") defaultAppBg else parseColor(state.appBgColor, Color(0xFFF5F5F5))
@@ -120,6 +128,7 @@ class MainActivity : ComponentActivity() {
                             colors = TopAppBarDefaults.topAppBarColors(containerColor = parsedAppBg),
                             actions = {
                                 IconButton(onClick = {
+                                    fromCall = false
                                     noteViewModel.init("")
                                     showPostCallNote = true
                                 }) {
@@ -150,10 +159,12 @@ class MainActivity : ComponentActivity() {
                             onLoadMoreContacts = viewModel::loadMoreContacts,
                             onLoadMoreNotes = viewModel::loadMoreNotes,
                             onEditContact = { contact ->
+                                fromCall = false
                                 noteViewModel.init(contact.phoneNumber)
                                 showPostCallNote = true
                             },
                             onEditNote = { note ->
+                                fromCall = false
                                 noteViewModel.init("", note.id)
                                 showPostCallNote = true
                             }
@@ -197,7 +208,10 @@ class MainActivity : ComponentActivity() {
                                 onTagToggle = noteViewModel::toggleTag,
                                 onSave = noteViewModel::save,
                                 onUpdate = noteViewModel::updateNote,
-                                onDismiss = { showPostCallNote = false }
+                                onDismiss = {
+                                    showPostCallNote = false
+                                    if (fromCall) shouldMinimize = true
+                                }
                             )
                         }
                     }
@@ -261,7 +275,7 @@ class MainActivity : ComponentActivity() {
                                 val action: () -> Unit = when (index) {
                                     0 -> { { showFabMenu = false; viewModel.selectTab(0) } }
                                     1 -> { { showFabMenu = false; viewModel.selectTab(1) } }
-                                    2 -> { { showFabMenu = false; noteViewModel.init(""); showPostCallNote = true } }
+                                    2 -> { { showFabMenu = false; fromCall = false; noteViewModel.init(""); showPostCallNote = true } }
                                     3 -> { { showFabMenu = false; showSettings = true } }
                                     else -> { { showFabMenu = false } }
                                 }

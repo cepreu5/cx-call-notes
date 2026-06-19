@@ -120,7 +120,11 @@ fun PostCallNoteScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (state.isEditMode) "📝 Редактиране" else "📝 Нова бележка",
+                        text = when {
+                        state.isEditMode -> "📝 Редактиране"
+                        state.isNewContact -> "📝 Нов контакт"
+                        else -> "📝 Нова бележка"
+                    },
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         color = parsedFont
