@@ -1,6 +1,19 @@
 *команда за проверка на грешки:
 .\gradlew.bat compileDebugKotlin --stacktrace --info*
 
+Задължителни настройки на Xiaomi:
+1. Autostart
+   - Settings → Apps → Manage apps → CX Call Notes → Autostart → Enable
+2. Display pop-up window
+   - Settings → Apps → CX Call Notes → Permissions → "Display pop-up window while running in background" → Allow
+3. Battery optimization
+   - Settings → Battery → CX Call Notes → No restrictions
+4. Lock screen notifications
+   - Settings → Notifications → Lock screen → Show notifications
+5. Overlay permission (вече се иска при първо стартиране)
+   - Settings → Apps → CX Call Notes → Display over other apps → Allow
+Как да стигнеш до тези настройки:
+- Settings → Apps → Manage apps → търси "CX Call Notes" → Permissions / Battery / Autostart
 Какво беше направено по задачите:
 
 ❖ Настройки на цветове (fontColor и formBgColor): Добавени са в MainViewModel (и MainUiState) с възможност за избор и запазване. SettingsDialog вече съдържа контроли за двата нови параметъра, а формата "Нова бележка" (PostCallNoteActivity) ги чете и оцветява текстовете и фона си спрямо тях.
