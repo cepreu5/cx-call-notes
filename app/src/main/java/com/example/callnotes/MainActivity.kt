@@ -205,7 +205,8 @@ class MainActivity : ComponentActivity() {
                                         },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(Icons.Default.Person, contentDescription = "Контакти", modifier = Modifier.size(20.dp))
+                                    Icon(Icons.Default.Settings, contentDescription = "Настройки", modifier = Modifier.size(20.dp))
+                                    
                                 }
                                 Box(
                                     modifier = Modifier
@@ -241,7 +242,7 @@ class MainActivity : ComponentActivity() {
                                         },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(Icons.Default.Settings, contentDescription = "Настройки", modifier = Modifier.size(20.dp))
+                                   Icon(Icons.Default.Person, contentDescription = "Контакти", modifier = Modifier.size(20.dp)) 
                                 }
                                 Box(
                                     modifier = Modifier
@@ -277,7 +278,7 @@ class MainActivity : ComponentActivity() {
                                             ) { change, dragAmount ->
                                                 change.consume()
                                                 fabXState = (fabXState + dragAmount.x).coerceIn(0f, maxX)
-                                                fabYState = (fabYState + dragAmount.y).coerceIn(0f, maxY)
+                                                fabYState = (fabYState + dragAmount.y).coerceIn(0f, maxY)+130
                                             }
                                         }
                                     }
