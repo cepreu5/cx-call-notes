@@ -33,7 +33,9 @@ data class MainUiState(
     val themeTertiary: String = "default",
     val tags: List<String> = emptyList(),
     val fabX: Int = -1,
-    val fabY: Int = -1
+    val fabY: Int = -1,
+    val fabTransparency: Int = 100,
+    val fabHidden: Boolean = false
 )
 
 class MainViewModel(
@@ -62,6 +64,8 @@ class MainViewModel(
         val tagsList = tagsStr.split(",").filter { it.isNotBlank() }
         val fabX = prefs.getInt("fab_x", -1)
         val fabY = prefs.getInt("fab_y", -1)
+        val fabTransparency = prefs.getInt("fab_transparency", 100)
+        val fabHidden = prefs.getBoolean("fab_hidden", false)
         _state.value = _state.value.copy(
             appBgColor = appBg,
             contactsBgColor = contactsBg,
@@ -75,7 +79,9 @@ class MainViewModel(
             themeTertiary = tertiaryCol,
             tags = tagsList,
             fabX = fabX,
-            fabY = fabY
+            fabY = fabY,
+            fabTransparency = fabTransparency,
+            fabHidden = fabHidden
         )
     }
     fun saveSettings(appBg: String, contactsBg: String, notesBg: String, fontCol: String, formBg: String, primaryCol: String, secondaryCol: String, tertiaryCol: String, tagsList: List<String>) {
@@ -108,6 +114,20 @@ class MainViewModel(
             apply()
         }
         _state.value = _state.value.copy(fabX = x, fabY = y)
+    }
+    fun saveFabTransparency(transparency: Int) {
+        prefs.edit().apply {
+            putInt("fab_transparency", transparency)
+            apply()
+        }
+        _state.value = _state.value.copy(fabTransparency = transparency)
+    }
+    fun saveFabHidden(hidden: Boolean) {
+        prefs.edit().apply {
+            putBoolean("fab_hidden", hidden)
+            apply()
+        }
+        _state.value = _state.value.copy(fabHidden = hidden)
     }
     fun load() {
         viewModelScope.launch {

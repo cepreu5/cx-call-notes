@@ -112,44 +112,44 @@ fun PostCallNoteScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
-                    .verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .verticalScroll(rememberScrollState())
             ) {
-                Text(
-                    text = if (state.isEditMode) "📝 Редактиране" else "📝 Нова бележка",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = parsedFont
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-                if (state.isEditMode) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                    ) {
-                        Text(
-                            text = state.phoneNumber,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(12.dp),
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (state.isEditMode) "📝 Редактиране" else "📝 Нова бележка",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = parsedFont
+                    )
+                    IconButton(onClick = {
+                        onPhoneChange("")
+                        onCallerNameChange("")
+                        onNoteTextChange("")
+                    }) {
+                        Icon(
+                            Icons.Default.Clear,
+                            contentDescription = "Изчисти",
+                            tint = parsedFont
                         )
                     }
-                } else {
-                    OutlinedTextField(
-                        value = state.phoneNumber,
-                        onValueChange = onPhoneChange,
-                        label = { Text("Телефон") },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = parsedFont,
-                            unfocusedTextColor = parsedFont
-                        ),
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    )
                 }
+                Spacer(modifier = Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = state.phoneNumber,
+                    onValueChange = onPhoneChange,
+                    label = { Text("Телефон") },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = parsedFont,
+                        unfocusedTextColor = parsedFont
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
                 Spacer(modifier = Modifier.height(6.dp))
                 OutlinedTextField(
                     value = state.callerName,

@@ -49,7 +49,9 @@ import com.example.callnotes.theme.CallNotesTheme
 import com.example.callnotes.ui.MainUiState
 import com.example.callnotes.ui.MainViewModel
 import com.example.callnotes.ui.MainViewModelFactory
-import com.example.callnotes.ui.PostCallNoteActivity
+import com.example.callnotes.ui.PostCallNoteViewModel
+import com.example.callnotes.ui.PostCallNoteViewModelFactory
+import com.example.callnotes.ui.PostCallNoteScreen
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -57,6 +59,9 @@ import java.util.Locale
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels {
         MainViewModelFactory((application as CallNotesApp).container.repository, this)
+    }
+    private val noteViewModel: PostCallNoteViewModel by viewModels {
+        PostCallNoteViewModelFactory((application as CallNotesApp).container.repository, this)
     }
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -76,6 +81,11 @@ class MainActivity : ComponentActivity() {
                 val state by viewModel.state.collectAsState()
                 var showSettings by remember { mutableStateOf(false) }
                 var showFabMenu by remember { mutableStateOf(false) }
+                var showPostCallNote by remember { mutableStateOf(false) }
+                val noteState by noteViewModel.uiState.collectAsState()
+                val prefs = remember { getSharedPreferences("cx_call_notes_prefs", Context.MODE_PRIVATE) }
+                val formBg = remember { prefs.getString("form_bg_color", "default") ?: "default" }
+                val fontCol = remember { prefs.getString("font_color", "default") ?: "default" }
                 val defaultAppBg = MaterialTheme.colorScheme.background
                 val parsedAppBg = remember(state.appBgColor, defaultAppBg) {
                     if (state.appBgColor == "default") defaultAppBg else parseColor(state.appBgColor, Color(0xFFF5F5F5))
@@ -110,8 +120,8 @@ class MainActivity : ComponentActivity() {
                             colors = TopAppBarDefaults.topAppBarColors(containerColor = parsedAppBg),
                             actions = {
                                 IconButton(onClick = {
-                                    val intent = Intent(this@MainActivity, PostCallNoteActivity::class.java)
-                                    startActivity(intent)
+                                    noteViewModel.init("")
+                                    showPostCallNote = true
                                 }) {
                                     Icon(Icons.Default.Add, contentDescription = "Добави")
                                 }
@@ -140,16 +150,12 @@ class MainActivity : ComponentActivity() {
                             onLoadMoreContacts = viewModel::loadMoreContacts,
                             onLoadMoreNotes = viewModel::loadMoreNotes,
                             onEditContact = { contact ->
-                                val intent = Intent(this@MainActivity, PostCallNoteActivity::class.java).apply {
-                                    putExtra(PostCallNoteActivity.EXTRA_PHONE, contact.phoneNumber)
-                                }
-                                startActivity(intent)
+                                noteViewModel.init(contact.phoneNumber)
+                                showPostCallNote = true
                             },
                             onEditNote = { note ->
-                                val intent = Intent(this@MainActivity, PostCallNoteActivity::class.java).apply {
-                                    putExtra(PostCallNoteActivity.EXTRA_NOTE_ID, note.id)
-                                }
-                                startActivity(intent)
+                                noteViewModel.init("", note.id)
+                                showPostCallNote = true
                             }
                         )
                         if (showSettings) {
@@ -163,15 +169,40 @@ class MainActivity : ComponentActivity() {
                                 currentThemeSecondary = state.themeSecondary,
                                 currentThemeTertiary = state.themeTertiary,
                                 currentTags = state.tags,
+                                currentFabTransparency = state.fabTransparency,
+                                currentFabHidden = state.fabHidden,
                                 onDismiss = { showSettings = false },
                                 onSave = { appBg, contactsBg, notesBg, fontColor, formBg, themePrimary, themeSecondary, themeTertiary, tags ->
                                     viewModel.saveSettings(appBg, contactsBg, notesBg, fontColor, formBg, themePrimary, themeSecondary, themeTertiary, tags)
                                     showSettings = false
+                                },
+                                onFabTransparencyChange = { viewModel.saveFabTransparency(it) },
+                                onFabHiddenChange = { viewModel.saveFabHidden(it) }
+                            )
+                        }
+                        if (showPostCallNote) {
+                            LaunchedEffect(noteState.saved) {
+                                if (noteState.saved) {
+                                    showPostCallNote = false
+                                    viewModel.load()
                                 }
+                            }
+                            PostCallNoteScreen(
+                                state = noteState,
+                                formBgColor = formBg,
+                                fontColor = fontCol,
+                                onPhoneChange = noteViewModel::updatePhoneNumber,
+                                onCallerNameChange = noteViewModel::updateCallerName,
+                                onNoteTextChange = noteViewModel::updateNoteText,
+                                onTagToggle = noteViewModel::toggleTag,
+                                onSave = noteViewModel::save,
+                                onUpdate = noteViewModel::updateNote,
+                                onDismiss = { showPostCallNote = false }
                             )
                         }
                     }
                     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                        if (!state.fabHidden) {
                         val screenW = constraints.maxWidth.toFloat()
                         val screenH = constraints.maxHeight.toFloat()
                         val maxX = (screenW - fabSizePx).coerceAtLeast(0f)
@@ -182,6 +213,7 @@ class MainActivity : ComponentActivity() {
                         val initialY = if (state.fabY < 0) defaultY else state.fabY.toFloat().coerceIn(0f, maxY)
                         var fabXState by remember { mutableFloatStateOf(initialX) }
                         var fabYState by remember { mutableFloatStateOf(initialY) }
+                        val fabAlpha = state.fabTransparency / 100f
                         val fabCenterX = fabXState + fabHalfPx
                         val fabCenterY = fabYState + fabHalfPx
                         val inwardX = if (fabCenterX >= screenW / 2f) -1f else 1f
@@ -229,8 +261,8 @@ class MainActivity : ComponentActivity() {
                                 val action: () -> Unit = when (index) {
                                     0 -> { { showFabMenu = false; viewModel.selectTab(0) } }
                                     1 -> { { showFabMenu = false; viewModel.selectTab(1) } }
-                                    2 -> { { showFabMenu = false; showSettings = true } }
-                                    3 -> { { showFabMenu = false; startActivity(Intent(this@MainActivity, PostCallNoteActivity::class.java)) } }
+                                    2 -> { { showFabMenu = false; noteViewModel.init(""); showPostCallNote = true } }
+                                    3 -> { { showFabMenu = false; showSettings = true } }
                                     else -> { { showFabMenu = false } }
                                 }
                                 Box(
@@ -249,8 +281,8 @@ class MainActivity : ComponentActivity() {
                                     when (index) {
                                         0 -> Icon(Icons.Default.Person, contentDescription = "Контакти", modifier = Modifier.size(20.dp))
                                         1 -> Icon(Icons.Default.Edit, contentDescription = "Бележки", modifier = Modifier.size(20.dp))
-                                        2 -> Icon(Icons.Default.Settings, contentDescription = "Настройки", modifier = Modifier.size(20.dp))
-                                        3 -> Icon(Icons.Default.Add, contentDescription = "Добави бележка", modifier = Modifier.size(20.dp))
+                                        2 -> Icon(Icons.Default.Add, contentDescription = "Добави бележка", modifier = Modifier.size(20.dp))
+                                        3 -> Icon(Icons.Default.Settings, contentDescription = "Настройки", modifier = Modifier.size(20.dp))
                                     }
                                 }
                             }
@@ -259,7 +291,7 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier
                                 .offset { IntOffset(fabXState.toInt(), fabYState.toInt()) }
                                 .size(fabSizeDp)
-                                .background(MaterialTheme.colorScheme.error, CircleShape)
+                                .background(MaterialTheme.colorScheme.error.copy(alpha = fabAlpha), CircleShape)
                                 .pointerInput(showFabMenu) {
                                     if (!showFabMenu) {
                                         detectDragGestures(
@@ -279,7 +311,8 @@ class MainActivity : ComponentActivity() {
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.Clear, contentDescription = "Меню", tint = Color.White)
+                            Icon(Icons.Default.Clear, contentDescription = "Меню", tint = Color.White.copy(alpha = fabAlpha))
+                        }
                         }
                     }
                 }
@@ -977,8 +1010,12 @@ fun SettingsDialog(
     currentThemeSecondary: String,
     currentThemeTertiary: String,
     currentTags: List<String>,
+    currentFabTransparency: Int,
+    currentFabHidden: Boolean,
     onDismiss: () -> Unit,
-    onSave: (String, String, String, String, String, String, String, String, List<String>) -> Unit
+    onSave: (String, String, String, String, String, String, String, String, List<String>) -> Unit,
+    onFabTransparencyChange: (Int) -> Unit,
+    onFabHiddenChange: (Boolean) -> Unit
 ) {
     var appBg by remember { mutableStateOf(currentAppBg) }
     var contactsBg by remember { mutableStateOf(currentContactsBg) }
@@ -989,6 +1026,8 @@ fun SettingsDialog(
     var themeSecondary by remember { mutableStateOf(currentThemeSecondary) }
     var themeTertiary by remember { mutableStateOf(currentThemeTertiary) }
     var tagsInput by remember { mutableStateOf(currentTags.joinToString(", ")) }
+    var fabTransparency by remember { mutableFloatStateOf(currentFabTransparency.toFloat()) }
+    var fabHidden by remember { mutableStateOf(currentFabHidden) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Настройки") },
@@ -1044,11 +1083,35 @@ fun SettingsDialog(
                     onValueChange = { tagsInput = it },
                     label = { Text("Списък етикети") }
                 )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = fabHidden,
+                        onCheckedChange = {
+                            fabHidden = it
+                            onFabHiddenChange(it)
+                        }
+                    )
+                    Text("Скрий FAB бутона")
+                }
+                Text("Прозрачност на FAB: ${fabTransparency.toInt()}%", fontWeight = FontWeight.Bold)
+                Slider(
+                    value = fabTransparency,
+                    onValueChange = { fabTransparency = it },
+                    onValueChangeFinished = { onFabTransparencyChange(fabTransparency.toInt()) },
+                    valueRange = 0f..100f,
+                    enabled = !fabHidden
+                )
             }
         },
         confirmButton = {
             Button(onClick = {
                 val tagsList = tagsInput.split(",").map { it.trim() }.filter { it.isNotEmpty() }.take(20)
+                onFabTransparencyChange(fabTransparency.toInt())
+                onFabHiddenChange(fabHidden)
                 onSave(appBg, contactsBg, notesBg, fontColor, formBgColor, themePrimary, themeSecondary, themeTertiary, tagsList)
             }) {
                 Text("Запази")

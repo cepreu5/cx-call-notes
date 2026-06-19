@@ -37,7 +37,7 @@ class PostCallNoteViewModel(
             finalPhone = prefs.getString("last_call_phone", "") ?: ""
             finalName = prefs.getString("last_call_name", "") ?: ""
         }
-        _uiState.value = _uiState.value.copy(
+        _uiState.value = PostCallNoteUiState(
             phoneNumber = finalPhone,
             callerName = finalName,
             noteId = noteId,
