@@ -16,14 +16,81 @@
 - Settings → Apps → Manage apps → търси "CX Call Notes" → Permissions / Battery / Autostart
 Какво беше направено по задачите:
 
-Ето какво промених:
-1. FAB позиция: Използва LocalView.current за реални екранни размери вместо BoxWithConstraints (който е ограничен от Scaffold padding)
-2. Подразбираща се позиция: средата на дясната граница
-3. Edge detection: Прагът е базиран на neededClearance (радиус на менюто + размер на иконка), а не на фиксен процент
-4. Ъгли: 1/4 окръжност (като преди)
-5. Граници: Полукръг хоризонтално/вертикално
-6. Drag: Премахнат +130 offset
-7. FAB стига до екрана: LocalView дава реалните пиксели на екрана
+Goal
+Building and iterating on an Android app called CX Call Notes (cx-calls) — a local call screening app that:
+- Checks incoming calls against a local Room database
+- Shows caller info overlay for known contacts during ringing
+- Shows a post-call note form for unknown contacts
+- Fully offline, no external services
+Instructions
+- User communicates in Bulgarian, prefers Bulgarian responses
+- Compile check after each change: .\gradlew.bat compileDebugKotlin
+- App is tested on Xiaomi (MIUI) device
+- User wants clean, minimal UI with customization options
+- # prefix on contact name = exclude from call processing (no overlay, no post-call form)
+- Contacts with # still show in Contacts list but not in Notes list
+- call_sessions table has been removed — schema simplified to just contacts and call_notes
+- fallbackToDestructiveMigration() removed — starting fresh
+- FAB menu icons: Контакти, Бележки, Добави бележка, Настройки (order changed)
+- Post-call note form is now a Compose Dialog (not separate Activity), shows with dimmed background like Settings
+Discoveries
+- Xiaomi/MIUI: Standard overlay approach works but requires enabling: Autostart, "Display pop-up window while running in background", Battery → No restrictions
+- Notification/Foreground service approach failed on Xiaomi — full-screen intent and foreground service couldn't show over lock screen. Reverted to SYSTEM_ALERT_WINDOW overlay approach
+- PostCallNoteActivity had android.telecom.action.POST_CALL intent-filter in manifest — system was launching it automatically after every call, overriding app logic. Removed it.
+- IncomingCallScreeningService doesn't fire on user's Xiaomi device — only PhoneStateReceiver handles calls
+- FAB positioning required moving from Scaffold's floatingActionButton slot to a separate BoxWithConstraints overlay in content area, because Scaffold constrains the coordinate space
+- remember keys on fabXState/fabYState caused position reset on recomposition — removed keys
+- Dialog's onDismiss with moveTaskToBack(true) requires LaunchedEffect pattern since it can't be called directly from composable lambda context
+Accomplished
+Completed:
+- Overlay on lock screen: SYSTEM_ALERT_WINDOW with FLAG_SHOW_WHEN_LOCKED + FLAG_TURN_SCREEN_ON — works on Xiaomi after enabling permissions
+- Draggable overlay: Saves/restores position via SharedPreferences, always uses Gravity.TOP or Gravity.START
+- Close button overlay: Circular red X button (ImageButton) with ripple background
+- Call sessions removed: call_sessions table, callSessionId, all session-related code deleted. DB version 3.
+- # prefix exclusion: Contacts starting with # skip overlay, skip post-call form, hidden from Notes list, visible in Contacts
+- FAB redesign: Default position = middle of right edge. Semicircle menu (6 positions, 4 icons, 45° spacing) on edges. 1/4 arc in corners and center. LocalView for full screen dimensions.
+- FAB transparency: Slider 0-100% in Settings, affects FAB background + X icon, NOT menu icons
+- FAB hide checkbox: In Settings, completely hides FAB + menu
+- Name wrapping: splitNameForFirstLine() — first line constrained for phone number, remaining lines full width. Applied to both Contacts and Notes cards.
+- Post-call form as Dialog: PostCallNoteScreen shown as Compose Dialog in MainActivity, not separate Activity. PostCallNoteViewModel instantiated in MainActivity.
+- "Нов contato" title: Shows "📝 Нов контакт" when caller is unknown
+- Cancel minimizes app: Uses shouldMinimize state + LaunchedEffect + moveTaskToBack(true)
+- Clear button on form: X button next to title clears all fields
+- Phone editable in edit mode: Removed Card/Text, always OutlinedTextField
+- DB permissions removed: POST_NOTIFICATIONS, USE_FULL_SCREEN_INTENT, FOREGROUND_SERVICE, FOREGROUND_SERVICE_PHONE_CALL
+Still needs work:
+- White flash before dialog appears (standard Android Dialog animation)
+- Could be eliminated by switching from Dialog to custom overlay (more complex)
+Relevant files / directories
+Core app files:
+- app/src/main/java/com/example/callnotes/MainActivity.kt — Main UI, FAB, SettingsDialog, PostCallNoteScreen, ContactsList, NotesList
+- app/src/main/java/com/example/callnotes/ui/PostCallNoteActivity.kt — PostCallNoteScreen composable (still used as UI component)
+- app/src/main/java/com/example/callnotes/ui/PostCallNoteViewModel.kt — Note/contact editing logic, isNewContact flag
+- app/src/main/java/com/example/callnotes/ui/MainViewModel.kt — Main screen state, settings load/save, fab position/transparency/hidden
+- app/src/main/java/com/example/callnotes/theme/Theme.kt
+Data layer:
+- app/src/main/java/com/example/callnotes/data/ContactEntity.kt
+- app/src/main/java/com/example/callnotes/data/CallNoteEntity.kt (no more callSessionId)
+- app/src/main/java/com/example/callnotes/data/ContactDao.kt
+- app/src/main/java/com/example/callnotes/data/CallNoteDao.kt
+- app/src/main/java/com/example/callnotes/data/AppDatabase.kt (version 3, 2 entities only)
+- app/src/main/java/com/example/callnotes/data/CallNotesRepository.kt
+- app/src/main/java/com/example/callnotes/data/DatabaseProvider.kt (no fallbackToDestructiveMigration)
+- app/src/main/java/com/example/callnotes/data/PhoneNumberNormalizer.kt
+Services:
+- app/src/main/java/com/example/callnotes/service/PhoneStateReceiver.kt — Main call handler on Xiaomi, # exclusion logic
+- app/src/main/java/com/example/callnotes/service/IncomingCallScreeningService.kt — Not active on user's device
+- app/src/main/java/com/example/callnotes/service/OverlayService.kt — Draggable overlay with saved position
+- app/src/main/java/com/example/callnotes/service/CallStateWatcher.kt
+- app/src/main/java/com/example/callnotes/service/CallUiEvents.kt (no more sessionId)
+Resources:
+- app/src/main/res/layout/overlay_note.xml — Overlay layout with circular close button
+- app/src/main/res/drawable/close_button_bg.xml, overlay_background.xml, ic_close.xml
+- app/src/main/AndroidManifest.xml — PostCallNoteActivity no longer has POST_CALL intent-filter
+
+---
+
+Следващите описания отразяват ранни и по-късни етапи от разработката, но за текущото състояние на приложението следват да се вземат предвид САМО последната версия на кода!!! 
 
 ❖ Настройки на цветове (fontColor и formBgColor): Добавени са в MainViewModel (и MainUiState) с възможност за избор и запазване. SettingsDialog вече съдържа контроли за двата нови параметъра, а формата "Нова бележка" (PostCallNoteActivity) ги чете и оцветява текстовете и фона си спрямо тях.
 ❖ Сенки на картите: Добавено е elevation = CardDefaults.cardElevation(defaultElevation = 4.dp) на картите на бележките и контактите за по-привлекателен триизмерен вид.
@@ -33,19 +100,13 @@
 ❖ FAB бутон Х: Добавен е червен плаващ бутон "X". При единично цъкване той минимизира приложението (moveTaskToBack(true)). При дълго натискане (long press) около него се появява меню за бърз достъп с 4 икони: Добавяне, Контакти, Бележки и Настройки.
 ❖ История на последното обаждане: При приключване на разговор PhoneStateReceiver записва телефонния номер и името в SharedPreferences под ключовете "last_call_phone" и "last_call_name". При отваряне на "Нова бележка" (през бутона "+"), ако телефонът е празен, автоматично се зареждат тези запазени данни.
 ❖ Увеличаване на броя етикети: Лимитът за брой етикети в Настройки е повдигнат от 10 на 20.
-❖ Цветни квадратчета в Настройки: Направени са с RoundedCornerShape(6.dp) – изглеждат като модерни цветни квадратчета вместо кръгчета.
 ❖ Интерактивен Color Picker: Всички числови стойности на RGB слайдерите и HEX стойността вече са текстови полета (OutlinedTextField), които могат да се редактират ръчно.
-❖ Промяна на формата "Нова бележка" на Овърлей: Формата вече е обгърната в Compose Dialog прозорец с Card обвивка, което я превръща в овърлей диалог (като настройките), вместо да заема цял екран.
-❖ Промяна на лейбъла: Текстът "Телефонен номер" е сменен на "Телефон".
 ❖ Съкращаване на бележката в Контакти: Текстът на последната бележка в списъка с контакти вече се ограничава точно до 1 ред с многоточие накрая (maxLines = 1, Ellipsis).
 ❖ Бутон "Обнови" и "Добави": При редактиране на контакт бутонът "Запази" е преименуван на "Добави", и е добавен нов бутон "Обнови" (викащ updateNote()), който само актуализира информацията в контакта без да генерира нова бележка в хронологията.
 
 ❖ Разширяване на диалозите до 95%: В PostCallNoteActivity вече се използва usePlatformDefaultWidth = false с fillMaxWidth(0.95f), което разширява формата "Нова бележка / Редактиране" до 95% от ширината на екрана.
 ❖ Квадрат за избрания цвят в Настройки: В ColorSelectorRow първият елемент е квадратен преглед (RoundedCornerShape(4.dp)) на текущо избрания цвят. Всички останали опции са кръгли (CircleShape). Избраният в момента цвят се показва в реално време в квадратчето.
 ❖ FAB бутон "X":
-❖ При кратко натискане, ако менюто е отворено, то се затваря. Ако е затворено, приложението се минимизира (moveTaskToBack(true)).
-❖ Дългото натискане сменя състоянието на менюто.
-❖ Икони около FAB: Разпределени са в правилна дъга (квадрант от 90° до 180°) около долния десен ъгъл.
 ❖ Primary, Secondary, Tertiary настройки за цвят: В настройките вече има три допълнителни селектора за Primary, Secondary и Tertiary цветове на темата. Промените по тях се записват и се зареждат динамично от CallNotesTheme, което директно преобразява интерфейса на цялото приложение.
 
 MainActivity.kt
@@ -56,16 +117,7 @@ val presets = listOf(
         "#E8F5E9" to Color(0xFFE8F5E9),
         "#F5F5F5" to Color(0xFFF5F5F5),
         "#E0F2F1" to Color(0xFFE0F2F1)
-        "default" to Color(0xFF37474F),
-        "#121212" to Color(0xFF121212),
-        "#1A237E" to Color(0xFF1A237E),
-        "#1B5E20" to Color(0xFF1B5E20),
-        "#3E2723" to Color(0xFF3E2723),
-        "#004D40" to Color(0xFF004D40)
-
-surfaceContainerLow (фонът на контакт картите) и secondaryContainer (фонът на бележки картите) автоматично стават много тъмни/черни.
-
-Решението: Принудих приложението винаги да използва светла тема с ясно дефинирани цветове:
+)
 
 surfaceContainerLow = Color(0xFFF3EDF7) — светло лилав фон за контакт панели
 secondaryContainer = Color(0xFFE8DEF8) — леко по-наситен лилав за бележки панели
@@ -106,16 +158,6 @@ note: String
 createdAt: Long
 updatedAt: Long
 
-### call_sessions
-За всеки входящ/изходящ разговор.
-id: Long
-phoneNumber: String
-callType: Int
-startedAt: Long
-screenedKnown: Boolean
-knownContactId: Long
-state: Int
-
 ### call_notes
 За бележките, които се въвеждат след разговора.
 id: Long
@@ -123,7 +165,6 @@ phoneNumber: String
 callerName: String
 noteText: String
 createdAt: Long
-callSessionId: Long
 
 За бързо търсене направи индекс върху phoneNumber във всички таблици, а върху contacts.phoneNumber сложи unique index.
 
@@ -187,562 +228,15 @@ ContactEntity.kt
 kotlin
 package com.example.callnotes.data
 
-import androidx.room.Entity
-import androidx.room.Index
-import androidx.room.PrimaryKey
-
-@Entity(
-    tableName = "contacts",
-    indices = [Index(value = ["phoneNumber"], unique = true)]
-)
-data class ContactEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val phoneNumber: String,
-    val displayName: String,
-    val company: String? = null,
-    val note: String? = null,
-    val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
-)
-CallSessionEntity.kt
-kotlin
-package com.example.callnotes.data
-
-import androidx.room.Entity
-import androidx.room.Index
-import androidx.room.PrimaryKey
-
-@Entity(
-    tableName = "call_sessions",
-    indices = [Index(value = ["phoneNumber"]), Index(value = ["knownContactId"])]
-)
-data class CallSessionEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val phoneNumber: String,
-    val callType: Int,
-    val startedAt: Long = System.currentTimeMillis(),
-    val endedAt: Long? = null,
-    val screenedKnown: Boolean = false,
-    val knownContactId: Long? = null,
-    val state: Int = 0
-)
-CallNoteEntity.kt
-kotlin
-package com.example.callnotes.data
-
-import androidx.room.Entity
-import androidx.room.Index
-import androidx.room.PrimaryKey
-
-@Entity(
-    tableName = "call_notes",
-    indices = [Index(value = ["phoneNumber"]), Index(value = ["callSessionId"])]
-)
-data class CallNoteEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val phoneNumber: String,
-    val callerName: String? = null,
-    val noteText: String,
-    val createdAt: Long = System.currentTimeMillis(),
-    val callSessionId: Long? = null
-)
-DAO
-ContactDao.kt
-kotlin
-package com.example.callnotes.data
-
-import androidx.room.*
-
-@Dao
-interface ContactDao {
-    @Query("SELECT * FROM contacts WHERE phoneNumber = :phone LIMIT 1")
-    suspend fun findByPhone(phone: String): ContactEntity?
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(contact: ContactEntity): Long
-
-    @Query("SELECT * FROM contacts ORDER BY updatedAt DESC")
-    suspend fun getAll(): List<ContactEntity>
-}
-CallSessionDao.kt
-kotlin
-package com.example.callnotes.data
-
-import androidx.room.*
-
-@Dao
-interface CallSessionDao {
-    @Insert
-    suspend fun insert(session: CallSessionEntity): Long
-
-    @Query("UPDATE call_sessions SET endedAt = :endedAt, state = :state WHERE id = :id")
-    suspend fun markEnded(id: Long, endedAt: Long, state: Int = 0)
-
-    @Query("UPDATE call_sessions SET screenedKnown = 1, knownContactId = :contactId WHERE id = :id")
-    suspend fun markKnown(id: Long, contactId: Long)
-}
-CallNoteDao.kt
-kotlin
-package com.example.callnotes.data
-
-import androidx.room.*
-
-@Dao
-interface CallNoteDao {
-    @Insert
-    suspend fun insert(note: CallNoteEntity): Long
-
-    @Query("SELECT * FROM call_notes ORDER BY createdAt DESC")
-    suspend fun getAll(): List<CallNoteEntity>
-}
-Database
-AppDatabase.kt
-kotlin
-package com.example.callnotes.data
-
-import androidx.room.Database
-import androidx.room.RoomDatabase
-
-@Database(
-    entities = [ContactEntity::class, CallSessionEntity::class, CallNoteEntity::class],
-    version = 1,
-    exportSchema = true
-)
-abstract class AppDatabase : RoomDatabase() {
-    abstract fun contactDao(): ContactDao
-    abstract fun callSessionDao(): CallSessionDao
-    abstract fun callNoteDao(): CallNoteDao
-}
-Service
-IncomingCallScreeningService.kt
-kotlin
-package com.example.callnotes.service
-
-import android.telecom.Call
-import android.telecom.CallScreeningService
-import com.example.callnotes.data.AppDatabase
-import com.example.callnotes.data.CallSessionEntity
-import com.example.callnotes.data.ContactEntity
-import com.example.callnotes.data.PhoneNumberNormalizer
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-
-class IncomingCallScreeningService : CallScreeningService() {
-
-    private val scope = CoroutineScope(Dispatchers.IO)
-
-    override fun onScreenCall(details: Call.Details) {
-        val rawNumber = details.handle?.schemeSpecificPart ?: return
-        val phone = PhoneNumberNormalizer.normalize(rawNumber)
-
-        scope.launch {
-            val db = DatabaseProvider.get(applicationContext)
-            val contact = db.contactDao().findByPhone(phone)
-
-            val sessionId = db.callSessionDao().insert(
-                CallSessionEntity(
-                    phoneNumber = phone,
-                    callType = Call.Details.DIRECTION_INCOMING,
-                    screenedKnown = contact != null,
-                    knownContactId = contact?.id
-                )
-            )
-
-            if (contact != null) {
-                respondToCall(
-                    details,
-                    CallResponse.Builder()
-                        .setDisallowCall(false)
-                        .setSilenceCall(false)
-                        .setSkipCallLog(false)
-                        .build()
-                )
-                CallUiEvents.postKnownCall(phone, contact.displayName, contact.note, sessionId)
-            } else {
-                respondToCall(
-                    details,
-                    CallResponse.Builder()
-                        .setDisallowCall(false)
-                        .setSilenceCall(false)
-                        .setSkipCallLog(false)
-                        .build()
-                )
-                CallUiEvents.postUnknownCall(phone, sessionId)
-            }
-        }
-    }
-}
-Helper
-PhoneNumberNormalizer.kt
-kotlin
-package com.example.callnotes.data
-
-object PhoneNumberNormalizer {
-    fun normalize(raw: String): String =
-        raw.replace("\\s+".toRegex(), "").replace("-", "").trim()
-}
-DatabaseProvider.kt
-kotlin
-package com.example.callnotes.data
-
-import android.content.Context
-import androidx.room.Room
-
-object DatabaseProvider {
-    @Volatile private var instance: AppDatabase? = null
-
-    fun get(context: Context): AppDatabase =
-        instance ?: synchronized(this) {
-            instance ?: Room.databaseBuilder(
-                context.applicationContext,
-                AppDatabase::class.java,
-                "callnotes.db"
-            ).build().also { instance = it }
-        }
-}
-Manifest
-AndroidManifest.xml
-xml
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-
-    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
-    <uses-permission android:name="android.permission.READ_CALL_LOG" />
-    <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
-    <uses-permission android:name="android.permission.BIND_SCREENING_SERVICE" />
-
-    <application
-        android:name=".CallNotesApp"
-        android:allowBackup="true"
-        android:label="Call Notes"
-        android:supportsRtl="true">
-
-        <service
-            android:name=".service.IncomingCallScreeningService"
-            android:permission="android.permission.BIND_SCREENING_SERVICE"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.telecom.CallScreeningService" />
-            </intent-filter>
-        </service>
-
-        <activity
-            android:name=".ui.MainActivity"
-            android:exported="true" />
-
-        <activity
-            android:name=".ui.PostCallNoteActivity"
-            android:exported="false" />
-    </application>
-</manifest>
 Забележки по Android API
 CallScreeningService е официалният механизъм за screen-ване на входящи повиквания, а Room трябва да е дефиниран с abstract RoomDatabase, entities и DAOs. TelephonyCallback.CallStateListener е наличният listener за call state, ако искаш да покажеш post-call форма след приключване на разговора.
 
 Ето допълненията в Kotlin за watcher, реална post-call форма и clean Repository + ViewModel слой. TelephonyCallback.CallStateListener е официалният listener за call state, а Room + ViewModel е стандартната Jetpack комбинация за отделяне на UI от persistence логика.
 
-CallStateWatcher
-CallStateWatcher.kt
-kotlin
-package com.example.callnotes.service
-
-import android.content.Context
-import android.content.Intent
-import android.telephony.TelephonyCallback
-import android.telephony.TelephonyManager
-import androidx.core.content.ContextCompat
-import com.example.callnotes.ui.PostCallNoteActivity
-import java.util.concurrent.Executor
-
-class CallStateWatcher(
-    private val context: Context,
-    private val onIdle: () -> Unit
-) {
-    private val telephonyManager =
-        context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-
-    private val executor = Executor { command -> command.run() }
-
-    private val callback = object : TelephonyCallback(), TelephonyCallback.CallStateListener {
-        override fun onCallStateChanged(state: Int) {
-            when (state) {
-                TelephonyManager.CALL_STATE_RINGING -> Unit
-                TelephonyManager.CALL_STATE_OFFHOOK -> Unit
-                TelephonyManager.CALL_STATE_IDLE -> {
-                    onIdle()
-                    val intent = Intent(context, PostCallNoteActivity::class.java)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    ContextCompat.startActivity(context, intent, null)
-                }
-            }
-        }
-    }
-
-    fun start() {
-        telephonyManager.registerTelephonyCallback(executor, callback)
-    }
-
-    fun stop() {
-        telephonyManager.unregisterTelephonyCallback(callback)
-    }
-}
-Repository
-CallNotesRepository.kt
-kotlin
-package com.example.callnotes.data
-
-class CallNotesRepository(
-    private val db: AppDatabase
-) {
-    private val contactDao = db.contactDao()
-    private val sessionDao = db.callSessionDao()
-    private val noteDao = db.callNoteDao()
-
-    suspend fun findContact(phone: String): ContactEntity? =
-        contactDao.findByPhone(phone)
-
-    suspend fun saveContact(contact: ContactEntity): Long =
-        contactDao.upsert(contact)
-
-    suspend fun createSession(phone: String, known: ContactEntity?): Long =
-        sessionDao.insert(
-            CallSessionEntity(
-                phoneNumber = phone,
-                callType = 1,
-                screenedKnown = known != null,
-                knownContactId = known?.id
-            )
-        )
-
-    suspend fun endSession(sessionId: Long) {
-        sessionDao.markEnded(sessionId, System.currentTimeMillis(), state = 0)
-    }
-
-    suspend fun saveNote(
-        phone: String,
-        callerName: String?,
-        noteText: String,
-        sessionId: Long? = null
-    ): Long {
-        return noteDao.insert(
-            CallNoteEntity(
-                phoneNumber = phone,
-                callerName = callerName,
-                noteText = noteText,
-                callSessionId = sessionId
-            )
-        )
-    }
-
-    suspend fun getAllContacts(): List<ContactEntity> = contactDao.getAll()
-    suspend fun getAllNotes(): List<CallNoteEntity> = noteDao.getAll()
-}
-ViewModel
-PostCallNoteViewModel.kt
-kotlin
-package com.example.callnotes.ui
-
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import com.example.callnotes.data.CallNotesRepository
-import com.example.callnotes.data.ContactEntity
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
-
-data class PostCallNoteUiState(
-    val phoneNumber: String = "",
-    val callerName: String = "",
-    val noteText: String = "",
-    val sessionId: Long? = null,
-    val saved: Boolean = false
-)
-
-class PostCallNoteViewModel(
-    private val repository: CallNotesRepository
-) : ViewModel() {
-
-    private val _uiState = MutableStateFlow(PostCallNoteUiState())
-    val uiState: StateFlow<PostCallNoteUiState> = _uiState
-
-    fun init(phone: String, sessionId: Long? = null) {
-        _uiState.value = _uiState.value.copy(phoneNumber = phone, sessionId = sessionId)
-    }
-
-    fun updateCallerName(value: String) {
-        _uiState.value = _uiState.value.copy(callerName = value)
-    }
-
-    fun updateNoteText(value: String) {
-        _uiState.value = _uiState.value.copy(noteText = value)
-    }
-
-    fun save() {
-        viewModelScope.launch {
-            val state = _uiState.value
-            repository.saveNote(
-                phone = state.phoneNumber,
-                callerName = state.callerName.ifBlank { null },
-                noteText = state.noteText,
-                sessionId = state.sessionId
-            )
-            if (state.callerName.isNotBlank()) {
-                repository.saveContact(
-                    ContactEntity(
-                        phoneNumber = state.phoneNumber,
-                        displayName = state.callerName,
-                        note = state.noteText
-                    )
-                )
-            }
-            _uiState.value = state.copy(saved = true)
-        }
-    }
-}
-PostCallNoteViewModelFactory.kt
-kotlin
-package com.example.callnotes.ui
-
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
-import com.example.callnotes.data.CallNotesRepository
-
-class PostCallNoteViewModelFactory(
-    private val repository: CallNotesRepository
-) : ViewModelProvider.Factory {
-    @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(PostCallNoteViewModel::class.java)) {
-            return PostCallNoteViewModel(repository) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
-    }
-}
-Real form
-PostCallNoteActivity.kt
-kotlin
-package com.example.callnotes.ui
-
-import android.os.Bundle
-import android.widget.Button
-import android.widget.EditText
-import android.widget.TextView
-import androidx.activity.ComponentActivity
-import androidx.activity.viewModels
-import androidx.lifecycle.lifecycleScope
-import com.example.callnotes.R
-import com.example.callnotes.data.AppDatabase
-import com.example.callnotes.data.CallNotesRepository
-import com.example.callnotes.data.DatabaseProvider
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
-
-class PostCallNoteActivity : ComponentActivity() {
-
-    private val viewModel: PostCallNoteViewModel by viewModels {
-        PostCallNoteViewModelFactory(
-            CallNotesRepository(DatabaseProvider.get(applicationContext))
-        )
-    }
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_post_call_note)
-
-        val phone = intent.getStringExtra(EXTRA_PHONE) ?: ""
-        val sessionId = intent.getLongExtra(EXTRA_SESSION_ID, -1).takeIf { it >= 0 }
-
-        viewModel.init(phone, sessionId)
-
-        findViewById<TextView>(R.id.phoneValue).text = phone
-        val nameEdit = findViewById<EditText>(R.id.nameEdit)
-        val noteEdit = findViewById<EditText>(R.id.noteEdit)
-        val saveBtn = findViewById<Button>(R.id.saveButton)
-
-        nameEdit.addTextChangedListenerSimple { viewModel.updateCallerName(it) }
-        noteEdit.addTextChangedListenerSimple { viewModel.updateNoteText(it) }
-
-        saveBtn.setOnClickListener {
-            viewModel.save()
-        }
-
-        lifecycleScope.launch {
-            viewModel.uiState.collectLatest { state ->
-                if (state.saved) finish()
-            }
-        }
-    }
-
-    companion object {
-        const val EXTRA_PHONE = "extra_phone"
-        const val EXTRA_SESSION_ID = "extra_session_id"
-    }
-}
-TextWatchers.kt
-kotlin
-package com.example.callnotes.ui
-
-import android.text.Editable
-import android.text.TextWatcher
-import android.widget.EditText
-
-fun EditText.addTextChangedListenerSimple(onText: (String) -> Unit) {
-    addTextChangedListener(object : TextWatcher {
-        override fun afterTextChanged(s: Editable?) = onText(s?.toString().orEmpty())
-        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-    })
-}
-Layout
-activity_post_call_note.xml
-xml
-<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical"
-    android:padding="20dp"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent">
-
-    <TextView
-        android:id="@+id/title"
-        android:text="Нова бележка"
-        android:textSize="20sp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content" />
-
-    <TextView
-        android:id="@+id/phoneValue"
-        android:textSize="16sp"
-        android:layout_marginTop="12dp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content" />
-
-    <EditText
-        android:id="@+id/nameEdit"
-        android:hint="Име на повикващия"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
-
-    <EditText
-        android:id="@+id/noteEdit"
-        android:hint="Кратък текст"
-        android:minLines="3"
-        android:gravity="top"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
-
-    <Button
-        android:id="@+id/saveButton"
-        android:text="Запази"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
-</LinearLayout>
 Свързване на watcher-а
 В MainActivity или в собствен service initializer можеш да стартираш CallStateWatcher и при IDLE да отвориш формата. Ако искаш по-чисто поведение, пусни watcher-а от foreground component или service, а не от Activity, за да не зависи от UI lifecycle. TelephonyCallback се регистрира през TelephonyManager.registerTelephonyCallback(Executor, TelephonyCallback).
 
-Бележка за реалния поток
-В практична версия бих препоръчал PostCallNoteActivity да получава phone и sessionId през Intent, а CallScreeningService да ги подава чрез shared state или repository lookup.
-
-пълен Hilt-less skeleton за проекта, организиран като класически Android app с Kotlin, Room, CallScreeningService, TelephonyCallback, ViewModel, repository и Application-level singleton wiring. Application е правилното място за глобална инициализация, а Room database instance трябва да е singleton в един process.
+Пълен Hilt-less skeleton за проекта, организиран като класически Android app с Kotlin, Room, CallScreeningService, TelephonyCallback, ViewModel, repository и Application-level singleton wiring. Application е правилното място за глобална инициализация, а Room database instance трябва да е singleton в един process.
 
 Проектна структура
 text
@@ -778,7 +272,8 @@ ui/
 
 util/
   IntentExt.kt
-Gradle dependencies
+
+### Gradle dependencies
 kotlin
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
@@ -794,454 +289,7 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }
-Application wiring
-CallNotesApp.kt
-kotlin
-package com.example.callnotes
 
-import android.app.Application
-import com.example.callnotes.data.DatabaseProvider
-import com.example.callnotes.data.CallNotesRepository
-
-class CallNotesApp : Application() {
-    val container by lazy {
-        AppContainer(this)
-    }
-
-    override fun onCreate() {
-        super.onCreate()
-        DatabaseProvider.init(this)
-    }
-}
-AppContainer.kt
-kotlin
-package com.example.callnotes
-
-import android.content.Context
-import com.example.callnotes.data.CallNotesRepository
-import com.example.callnotes.data.DatabaseProvider
-
-class AppContainer(context: Context) {
-    val repository: CallNotesRepository = CallNotesRepository(DatabaseProvider.get(context))
-}
-Data layer
-DatabaseProvider.kt
-kotlin
-package com.example.callnotes.data
-
-import android.content.Context
-import androidx.room.Room
-
-object DatabaseProvider {
-    @Volatile private var instance: AppDatabase? = null
-    private lateinit var appContext: Context
-
-    fun init(context: Context) {
-        appContext = context.applicationContext
-    }
-
-    fun get(context: Context = appContext): AppDatabase =
-        instance ?: synchronized(this) {
-            instance ?: Room.databaseBuilder(
-                context.applicationContext,
-                AppDatabase::class.java,
-                "callnotes.db"
-            ).build().also { instance = it }
-        }
-}
-CallNotesRepository.kt
-kotlin
-package com.example.callnotes.data
-
-class CallNotesRepository(
-    private val db: AppDatabase
-) {
-    suspend fun findContact(phone: String) = db.contactDao().findByPhone(phone)
-    suspend fun saveContact(contact: ContactEntity) = db.contactDao().upsert(contact)
-    suspend fun getAllContacts() = db.contactDao().getAll()
-    suspend fun getAllNotes() = db.callNoteDao().getAll()
-
-    suspend fun createSession(phone: String, known: ContactEntity?) =
-        db.callSessionDao().insert(
-            CallSessionEntity(
-                phoneNumber = phone,
-                callType = 1,
-                screenedKnown = known != null,
-                knownContactId = known?.id
-            )
-        )
-
-    suspend fun endSession(sessionId: Long) {
-        db.callSessionDao().markEnded(sessionId, System.currentTimeMillis(), state = 0)
-    }
-
-    suspend fun saveNote(
-        phone: String,
-        callerName: String?,
-        noteText: String,
-        sessionId: Long? = null
-    ) = db.callNoteDao().insert(
-        CallNoteEntity(
-            phoneNumber = phone,
-            callerName = callerName,
-            noteText = noteText,
-            callSessionId = sessionId
-        )
-    )
-}
-Call screening
-IncomingCallScreeningService.kt
-kotlin
-package com.example.callnotes.service
-
-import android.telecom.Call
-import android.telecom.CallScreeningService
-import com.example.callnotes.data.DatabaseProvider
-import com.example.callnotes.data.PhoneNumberNormalizer
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-
-class IncomingCallScreeningService : CallScreeningService() {
-
-    private val scope = CoroutineScope(Dispatchers.IO)
-
-    override fun onScreenCall(details: Call.Details) {
-        val raw = details.handle?.schemeSpecificPart ?: return
-        val phone = PhoneNumberNormalizer.normalize(raw)
-
-        scope.launch {
-            val db = DatabaseProvider.get(applicationContext)
-            val contact = db.contactDao().findByPhone(phone)
-
-            val sessionId = db.callSessionDao().insert(
-                com.example.callnotes.data.CallSessionEntity(
-                    phoneNumber = phone,
-                    callType = Call.Details.DIRECTION_INCOMING,
-                    screenedKnown = contact != null,
-                    knownContactId = contact?.id
-                )
-            )
-
-            respondToCall(
-                details,
-                CallResponse.Builder()
-                    .setDisallowCall(false)
-                    .setSilenceCall(false)
-                    .setSkipCallLog(false)
-                    .build()
-            )
-
-            if (contact != null) {
-                CallUiEvents.emitKnown(phone, contact.displayName, contact.note, sessionId)
-            } else {
-                CallUiEvents.emitUnknown(phone, sessionId)
-            }
-        }
-    }
-}
-CallUiEvents.kt
-kotlin
-package com.example.callnotes.service
-
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-
-data class KnownCallEvent(val phone: String, val name: String, val note: String?, val sessionId: Long)
-data class UnknownCallEvent(val phone: String, val sessionId: Long)
-
-object CallUiEvents {
-    private val _known = MutableSharedFlow<KnownCallEvent>(extraBufferCapacity = 1)
-    private val _unknown = MutableSharedFlow<UnknownCallEvent>(extraBufferCapacity = 1)
-
-    val known: SharedFlow<KnownCallEvent> = _known
-    val unknown: SharedFlow<UnknownCallEvent> = _unknown
-
-    fun emitKnown(phone: String, name: String, note: String?, sessionId: Long) {
-        _known.tryEmit(KnownCallEvent(phone, name, note, sessionId))
-    }
-
-    fun emitUnknown(phone: String, sessionId: Long) {
-        _unknown.tryEmit(UnknownCallEvent(phone, sessionId))
-    }
-}
-Call state watcher
-CallStateWatcher.kt
-kotlin
-package com.example.callnotes.service
-
-import android.content.Context
-import android.content.Intent
-import android.telephony.TelephonyCallback
-import android.telephony.TelephonyManager
-import androidx.core.content.ContextCompat
-import com.example.callnotes.ui.PostCallNoteActivity
-import java.util.concurrent.Executor
-
-class CallStateWatcher(
-    private val context: Context,
-    private val onIdle: () -> Unit
-) {
-    private val telephonyManager =
-        context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-
-    private val executor = Executor { it.run() }
-
-    private val callback = object : TelephonyCallback(), TelephonyCallback.CallStateListener {
-        override fun onCallStateChanged(state: Int) {
-            if (state == TelephonyManager.CALL_STATE_IDLE) {
-                onIdle()
-                val intent = Intent(context, PostCallNoteActivity::class.java)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                ContextCompat.startActivity(context, intent, null)
-            }
-        }
-    }
-
-    fun start() {
-        telephonyManager.registerTelephonyCallback(executor, callback)
-    }
-
-    fun stop() {
-        telephonyManager.unregisterTelephonyCallback(callback)
-    }
-}
-ViewModels
-MainViewModel.kt
-kotlin
-package com.example.callnotes.ui
-
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import com.example.callnotes.data.CallNotesRepository
-import com.example.callnotes.data.ContactEntity
-import com.example.callnotes.data.CallNoteEntity
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
-
-data class MainUiState(
-    val contacts: List<ContactEntity> = emptyList(),
-    val notes: List<CallNoteEntity> = emptyList()
-)
-
-class MainViewModel(
-    private val repository: CallNotesRepository
-) : ViewModel() {
-
-    private val _state = MutableStateFlow(MainUiState())
-    val state: StateFlow<MainUiState> = _state
-
-    fun load() {
-        viewModelScope.launch {
-            _state.value = MainUiState(
-                contacts = repository.getAllContacts(),
-                notes = repository.getAllNotes()
-            )
-        }
-    }
-}
-MainViewModelFactory.kt
-kotlin
-package com.example.callnotes.ui
-
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
-import com.example.callnotes.data.CallNotesRepository
-
-class MainViewModelFactory(
-    private val repository: CallNotesRepository
-) : ViewModelProvider.Factory {
-    @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
-            return MainViewModel(repository) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
-    }
-}
-PostCallNoteViewModel.kt
-kotlin
-package com.example.callnotes.ui
-
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import com.example.callnotes.data.CallNotesRepository
-import com.example.callnotes.data.ContactEntity
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
-
-data class PostCallNoteUiState(
-    val phoneNumber: String = "",
-    val callerName: String = "",
-    val noteText: String = "",
-    val sessionId: Long? = null,
-    val saved: Boolean = false
-)
-
-class PostCallNoteViewModel(
-    private val repository: CallNotesRepository
-) : ViewModel() {
-
-    private val _uiState = MutableStateFlow(PostCallNoteUiState())
-    val uiState: StateFlow<PostCallNoteUiState> = _uiState
-
-    fun init(phone: String, sessionId: Long? = null) {
-        _uiState.value = _uiState.value.copy(phoneNumber = phone, sessionId = sessionId)
-    }
-
-    fun updateCallerName(value: String) {
-        _uiState.value = _uiState.value.copy(callerName = value)
-    }
-
-    fun updateNoteText(value: String) {
-        _uiState.value = _uiState.value.copy(noteText = value)
-    }
-
-    fun save() {
-        viewModelScope.launch {
-            val s = _uiState.value
-            repository.saveNote(s.phoneNumber, s.callerName.ifBlank { null }, s.noteText, s.sessionId)
-            if (s.callerName.isNotBlank()) {
-                repository.saveContact(
-                    ContactEntity(
-                        phoneNumber = s.phoneNumber,
-                        displayName = s.callerName,
-                        note = s.noteText
-                    )
-                )
-            }
-            _uiState.value = s.copy(saved = true)
-        }
-    }
-}
-PostCallNoteViewModelFactory.kt
-kotlin
-package com.example.callnotes.ui
-
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
-import com.example.callnotes.data.CallNotesRepository
-
-class PostCallNoteViewModelFactory(
-    private val repository: CallNotesRepository
-) : ViewModelProvider.Factory {
-    @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(PostCallNoteViewModel::class.java)) {
-            return PostCallNoteViewModel(repository) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
-    }
-}
-UI activities
-MainActivity.kt
-kotlin
-package com.example.callnotes.ui
-
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.viewModels
-import com.example.callnotes.CallNotesApp
-
-class MainActivity : ComponentActivity() {
-
-    private val viewModel: MainViewModel by viewModels {
-        MainViewModelFactory((application as CallNotesApp).container.repository)
-    }
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        viewModel.load()
-    }
-}
-PostCallNoteActivity.kt
-kotlin
-package com.example.callnotes.ui
-
-import android.os.Bundle
-import android.widget.Button
-import android.widget.EditText
-import android.widget.TextView
-import androidx.activity.ComponentActivity
-import androidx.activity.viewModels
-import androidx.lifecycle.lifecycleScope
-import com.example.callnotes.CallNotesApp
-import com.example.callnotes.R
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
-
-class PostCallNoteActivity : ComponentActivity() {
-
-    private val viewModel: PostCallNoteViewModel by viewModels {
-        PostCallNoteViewModelFactory((application as CallNotesApp).container.repository)
-    }
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_post_call_note)
-
-        val phone = intent.getStringExtra(EXTRA_PHONE) ?: ""
-        val sessionId = intent.getLongExtra(EXTRA_SESSION_ID, -1).takeIf { it >= 0 }
-
-        viewModel.init(phone, sessionId)
-
-        val phoneValue = findViewById<TextView>(R.id.phoneValue)
-        val nameEdit = findViewById<EditText>(R.id.nameEdit)
-        val noteEdit = findViewById<EditText>(R.id.noteEdit)
-        val saveBtn = findViewById<Button>(R.id.saveButton)
-
-        phoneValue.text = phone
-        nameEdit.addTextChangedListenerSimple { viewModel.updateCallerName(it) }
-        noteEdit.addTextChangedListenerSimple { viewModel.updateNoteText(it) }
-
-        saveBtn.setOnClickListener { viewModel.save() }
-
-        lifecycleScope.launch {
-            viewModel.uiState.collectLatest { if (it.saved) finish() }
-        }
-    }
-
-    companion object {
-        const val EXTRA_PHONE = "extra_phone"
-        const val EXTRA_SESSION_ID = "extra_session_id"
-    }
-}
-Manifest
-AndroidManifest.xml
-xml
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-
-    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
-    <uses-permission android:name="android.permission.READ_CALL_LOG" />
-    <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
-    <uses-permission android:name="android.permission.BIND_SCREENING_SERVICE" />
-
-    <application
-        android:name=".CallNotesApp"
-        android:allowBackup="true"
-        android:label="Call Notes"
-        android:supportsRtl="true">
-
-        <service
-            android:name=".service.IncomingCallScreeningService"
-            android:permission="android.permission.BIND_SCREENING_SERVICE"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.telecom.CallScreeningService" />
-            </intent-filter>
-        </service>
-
-        <activity
-            android:name=".ui.MainActivity"
-            android:exported="true" />
-
-        <activity
-            android:name=".ui.PostCallNoteActivity"
-            android:exported="false" />
-    </application>
-</manifest>
 Бързи бележки
 CallScreeningService служи за call screening/identification на входящи разговори, а TelephonyCallback.CallStateListener е подходящият callback за state changes; Room с repository + ViewModel е стандартният Jetpack подход. Application-класът е базовият контейнер за глобална инициализация и тук е използван за wiring без Hilt
 
@@ -1478,9 +526,8 @@ class MainActivity : ComponentActivity() {
         }.show(supportFragmentManager, "post_call")
     }
 }
+
 Ключови точки
 Flutter: showModalBottomSheet + EventChannel stream unknownCallPending отваря диалог автоматично.
-
 Kotlin: DialogFragment.show(fragmentManager, tag) управлява dialog state и автоматично възстановява при config changes.
-
 При запазване се извиква saveNote/saveContact чрез MethodChannel в/flutter bridge или директно в Kotlin.

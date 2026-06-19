@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.callnotes.CallNotesApp
 import com.example.callnotes.theme.CallNotesTheme
+import com.example.callnotes.theme.ColorConstants
 
 fun parseColor(hex: String, default: Color): Color = try {
     if (hex == "default") default else Color(android.graphics.Color.parseColor(hex))
@@ -212,11 +213,15 @@ fun PostCallNoteScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    OutlinedButton(
+                    Button(
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = ColorConstants.ButtonBackground,
+                            contentColor = ColorConstants.ButtonFontColor
+                        )
                     ) {
                         Text("Отказ", maxLines = 1, softWrap = false)
                     }
@@ -225,7 +230,11 @@ fun PostCallNoteScreen(
                             onClick = onUpdate,
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = ColorConstants.ButtonBackground,
+                                contentColor = ColorConstants.ButtonFontColor
+                            )
                         ) {
                             Text("Обнови", maxLines = 1, softWrap = false)
                         }
@@ -234,7 +243,11 @@ fun PostCallNoteScreen(
                         onClick = onSave,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = ColorConstants.ButtonBackground,
+                            contentColor = ColorConstants.ButtonFontColor
+                        )
                     ) {
                         Text("Добави", maxLines = 1, softWrap = false)
                     }
@@ -248,15 +261,22 @@ fun PostCallNoteScreen(
 fun FormTagChip(tag: String, selected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .background(if (selected) Color(0xFFFFE0B2) else Color.Transparent, RoundedCornerShape(6.dp))
-            .border(1.dp, if (selected) Color(0xFFFF9800) else Color.LightGray, RoundedCornerShape(6.dp))
+            .background(
+                if (selected) MaterialTheme.colorScheme.tertiaryContainer else Color.Transparent,
+                RoundedCornerShape(6.dp)
+            )
+            .border(
+                1.dp,
+                if (selected) MaterialTheme.colorScheme.tertiary else Color.LightGray,
+                RoundedCornerShape(6.dp)
+            )
             .clickable { onClick() }
             .padding(horizontal = 10.dp, vertical = 4.dp)
     ) {
         Text(
             text = tag,
             style = MaterialTheme.typography.bodySmall.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal),
-            color = if (selected) Color(0xFFE65100) else Color.Gray
+            color = if (selected) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.outline
         )
     }
 }

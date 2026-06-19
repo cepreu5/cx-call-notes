@@ -28,13 +28,16 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -46,6 +49,7 @@ import androidx.core.content.ContextCompat
 import com.example.callnotes.data.CallNoteEntity
 import com.example.callnotes.data.ContactEntity
 import com.example.callnotes.theme.CallNotesTheme
+import com.example.callnotes.theme.ColorConstants
 import com.example.callnotes.ui.MainUiState
 import com.example.callnotes.ui.MainViewModel
 import com.example.callnotes.ui.MainViewModelFactory
@@ -84,6 +88,8 @@ class MainActivity : ComponentActivity() {
                 var showPostCallNote by remember { mutableStateOf(false) }
                 var shouldMinimize by remember { mutableStateOf(false) }
                 var fromCall by remember { mutableStateOf(false) }
+                val snackbarHostState = remember { SnackbarHostState() }
+                val coroutineScope = rememberCoroutineScope()
                 val noteState by noteViewModel.uiState.collectAsState()
                 val prefs = remember { getSharedPreferences("cx_call_notes_prefs", Context.MODE_PRIVATE) }
                 val formBg = remember { prefs.getString("form_bg_color", "default") ?: "default" }
@@ -102,6 +108,7 @@ class MainActivity : ComponentActivity() {
                 Scaffold(
                     modifier = Modifier.background(parsedAppBg),
                     containerColor = parsedAppBg,
+                    snackbarHost = { SnackbarHost(snackbarHostState) },
                     topBar = {
                         @OptIn(ExperimentalMaterial3Api::class)
                         TopAppBar(
@@ -109,20 +116,22 @@ class MainActivity : ComponentActivity() {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Box(
                                         modifier = Modifier
-                                            .size(36.dp)
-                                            .background(Color(0xFFFF9800), CircleShape)
-                                            .padding(6.dp),
+                                            .size(54.dp)
+                                            .clip(CircleShape),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Icon(
-                                            Icons.Default.Call,
+                                        androidx.compose.foundation.Image(
+                                            painter = androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_foreground),
                                             contentDescription = null,
-                                            tint = Color.White,
                                             modifier = Modifier.fillMaxSize()
                                         )
                                     }
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("CX Call Notes", fontWeight = FontWeight.Bold)
+                                    Text(
+                                        "CX Call Notes",
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
                                 }
                             },
                             colors = TopAppBarDefaults.topAppBarColors(containerColor = parsedAppBg),
@@ -132,21 +141,21 @@ class MainActivity : ComponentActivity() {
                                     noteViewModel.init("")
                                     showPostCallNote = true
                                 }) {
-                                    Icon(Icons.Default.Add, contentDescription = "Добави")
+                                    Icon(Icons.Default.Add, contentDescription = "Добави", tint = MaterialTheme.colorScheme.primary)
                                 }
                                 IconButton(onClick = { showSettings = true }) {
-                                    Icon(Icons.Default.Settings, contentDescription = "Настройки")
+                                    Icon(Icons.Default.Settings, contentDescription = "Настройки", tint = MaterialTheme.colorScheme.primary)
                                 }
                             }
                         )
                     },
                 ) { padding ->
                     val density = LocalDensity.current
-                    val fabSizeDp = 56.dp
+                    val fabSizeDp = 45.dp
                     val fabSizePx = with(density) { fabSizeDp.toPx() }
-                    val menuIconSizeDp = 36.dp
+                    val menuIconSizeDp = 32.dp
                     val menuIconSizePx = with(density) { menuIconSizeDp.toPx() }
-                    val menuRadiusPx = with(density) { 80.dp.toPx() }
+                    val menuRadiusPx = with(density) { 72.dp.toPx() }
                     val fabHalfPx = fabSizePx / 2f
                     Box(modifier = Modifier.fillMaxSize().padding(padding)) {
                         MainScreen(
@@ -184,11 +193,29 @@ class MainActivity : ComponentActivity() {
                                 currentFabHidden = state.fabHidden,
                                 onDismiss = { showSettings = false },
                                 onSave = { appBg, contactsBg, notesBg, fontColor, formBg, themePrimary, themeSecondary, themeTertiary, tags ->
-                                    viewModel.saveSettings(appBg, contactsBg, notesBg, fontColor, formBg, themePrimary, themeSecondary, themeTertiary, tags)
+                                    val needsRestart = fontColor != state.fontColor ||
+                                        formBg != state.formBgColor ||
+                                        themePrimary != state.themePrimary ||
+                                        themeSecondary != state.themeSecondary ||
+                                        themeTertiary != state.themeTertiary
                                     showSettings = false
+                                    viewModel.saveSettings(appBg, contactsBg, notesBg, fontColor, formBg, themePrimary, themeSecondary, themeTertiary, tags)
+                                    if (needsRestart) {
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar("Промените изискват рестарт на приложението", duration = SnackbarDuration.Long)
+                                        }
+                                    }
                                 },
-                                onFabTransparencyChange = { viewModel.saveFabTransparency(it) },
-                                onFabHiddenChange = { viewModel.saveFabHidden(it) }
+                            onFabTransparencyChange = { viewModel.saveFabTransparency(it) },
+                            onFabHiddenChange = { viewModel.saveFabHidden(it) },
+                            onReset = {
+                                val ctx = this@MainActivity
+                                ctx.getSharedPreferences("cx_call_notes_prefs", Context.MODE_PRIVATE).edit().clear().apply()
+                                val restartIntent = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)
+                                ctx.startActivity(restartIntent)
+                                ctx.finish()
+                                Runtime.getRuntime().exit(0)
+                            }
                             )
                         }
                         if (showPostCallNote) {
@@ -288,15 +315,17 @@ class MainActivity : ComponentActivity() {
                                                 (fabYState + (fabSizePx - menuIconSizePx) / 2f + slot.dy).toInt()
                                             )
                                         }
-                                        .background(Color(0xFFE0E0E0), CircleShape)
+                                        .shadow(2.dp, CircleShape)
+                                        .background(Color.White, CircleShape)
+                                        .border(0.5.dp, Color.LightGray, CircleShape)
                                         .clickable { action() },
                                     contentAlignment = Alignment.Center
                                 ) {
                                     when (index) {
-                                        0 -> Icon(Icons.Default.Person, contentDescription = "Контакти", modifier = Modifier.size(20.dp))
-                                        1 -> Icon(Icons.Default.Edit, contentDescription = "Бележки", modifier = Modifier.size(20.dp))
-                                        2 -> Icon(Icons.Default.Add, contentDescription = "Добави бележка", modifier = Modifier.size(20.dp))
-                                        3 -> Icon(Icons.Default.Settings, contentDescription = "Настройки", modifier = Modifier.size(20.dp))
+                                        0 -> Icon(Icons.Default.Person, contentDescription = "Контакти", modifier = Modifier.size(18.dp), tint = Color.DarkGray)
+                                        1 -> Icon(Icons.AutoMirrored.Default.Note, contentDescription = "Бележки", modifier = Modifier.size(18.dp), tint = Color.DarkGray)
+                                        2 -> Icon(Icons.Default.Add, contentDescription = "Добави бележка", modifier = Modifier.size(18.dp), tint = Color.DarkGray)
+                                        3 -> Icon(Icons.Default.Settings, contentDescription = "Настройки", modifier = Modifier.size(18.dp), tint = Color.DarkGray)
                                     }
                                 }
                             }
@@ -305,7 +334,9 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier
                                 .offset { IntOffset(fabXState.toInt(), fabYState.toInt()) }
                                 .size(fabSizeDp)
-                                .background(MaterialTheme.colorScheme.error.copy(alpha = fabAlpha), CircleShape)
+                                .shadow(4.dp, CircleShape)
+                                .background(Color.White.copy(alpha = 0.85f * fabAlpha), CircleShape)
+                                .border(1.dp, Color.LightGray.copy(alpha = fabAlpha), CircleShape)
                                 .pointerInput(showFabMenu) {
                                     if (!showFabMenu) {
                                         detectDragGestures(
@@ -325,7 +356,7 @@ class MainActivity : ComponentActivity() {
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.Clear, contentDescription = "Меню", tint = Color.White.copy(alpha = fabAlpha))
+                            Icon(Icons.Default.Clear, contentDescription = "Меню", tint = Color.DarkGray.copy(alpha = fabAlpha), modifier = Modifier.size(20.dp))
                         }
                         }
                     }
@@ -414,7 +445,8 @@ fun MainScreen(
         )
         TabRow(
             selectedTabIndex = state.selectedTab,
-            containerColor = Color.Transparent
+            containerColor = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.primary
         ) {
             Tab(
                 selected = state.selectedTab == 0,
@@ -426,7 +458,7 @@ fun MainScreen(
                 selected = state.selectedTab == 1,
                 onClick = { onTabSelected(1) },
                 text = { Text("Бележки") },
-                icon = { Icon(Icons.Default.Edit, contentDescription = null) }
+                icon = { Icon(Icons.AutoMirrored.Default.Note, contentDescription = null) }
             )
         }
         when (state.selectedTab) {
@@ -498,7 +530,13 @@ fun ContactsList(
             if (hasMore) {
                 item {
                     Box(modifier = Modifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.Center) {
-                        Button(onClick = onLoadMore) {
+                        Button(
+                            onClick = onLoadMore,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = ColorConstants.ButtonBackground,
+                                contentColor = ColorConstants.ButtonFontColor
+                            )
+                        ) {
                             Text("Покажи още")
                         }
                     }
@@ -549,7 +587,7 @@ fun ContactCard(
                 Text(
                     text = contact.phoneNumber,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.combinedClickable(
                         onClick = { onEdit(contact) },
                         onLongClick = { onSelectSearch(contact.phoneNumber) }
@@ -604,7 +642,7 @@ fun ContactCard(
                 Text(
                     text = formattedDate,
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF666666),
+                    color = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.combinedClickable(
                         onClick = {},
                         onLongClick = { onSelectSearch(formattedOnlyDate) }
@@ -630,7 +668,7 @@ fun NotesList(
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
-                    Icons.Default.Edit,
+                    Icons.AutoMirrored.Default.Note,
                     contentDescription = null,
                     modifier = Modifier.size(64.dp),
                     tint = MaterialTheme.colorScheme.outlineVariant
@@ -659,7 +697,13 @@ fun NotesList(
             if (hasMore) {
                 item {
                     Box(modifier = Modifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.Center) {
-                        Button(onClick = onLoadMore) {
+                        Button(
+                            onClick = onLoadMore,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = ColorConstants.ButtonBackground,
+                                contentColor = ColorConstants.ButtonFontColor
+                            )
+                        ) {
                             Text("Покажи още")
                         }
                     }
@@ -697,7 +741,7 @@ fun NoteCard(
                     text = nameParts.first,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF333333),
+                    color = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier
                         .weight(1f)
                         .padding(end = 8.dp)
@@ -709,7 +753,7 @@ fun NoteCard(
                 Text(
                     text = note.phoneNumber,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.combinedClickable(
                         onClick = { onEdit(note) },
                         onLongClick = { onSelectSearch(note.phoneNumber) }
@@ -721,7 +765,7 @@ fun NoteCard(
                     text = nameParts.second,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF333333),
+                    color = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier
                         .fillMaxWidth()
                         .combinedClickable(
@@ -738,7 +782,7 @@ fun NoteCard(
                 Text(
                     text = formattedDate,
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF666666),
+                    color = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.combinedClickable(
                         onClick = {},
                         onLongClick = { onSelectSearch(formattedOnlyDate) }
@@ -759,7 +803,7 @@ fun WordSelectableText(text: String, onSelectWord: (String) -> Unit) {
             Text(
                 text = word + " ",
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color(0xFF555555),
+                color = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.combinedClickable(
                     onClick = {},
                     onLongClick = { if (cleanWord.isNotEmpty()) onSelectWord(cleanWord) }
@@ -773,15 +817,15 @@ fun WordSelectableText(text: String, onSelectWord: (String) -> Unit) {
 fun TagChip(tag: String, onSelectSearch: (String) -> Unit) {
     Box(
         modifier = Modifier
-            .background(Color(0xFFFFE0B2), RoundedCornerShape(6.dp))
-            .border(1.dp, Color(0xFFFF9800), RoundedCornerShape(6.dp))
+            .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(6.dp))
+            .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(6.dp))
             .clickable { onSelectSearch(tag) }
             .padding(horizontal = 8.dp, vertical = 2.dp)
     ) {
         Text(
             text = tag,
             style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-            color = Color(0xFFE65100)
+            color = Color.DarkGray
         )
     }
 }
@@ -1000,12 +1044,24 @@ fun CustomColorPickerDialog(
             }
         },
         confirmButton = {
-            Button(onClick = { onColorSelected(hexString) }) {
+            Button(
+                onClick = { onColorSelected(hexString) },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = ColorConstants.ButtonBackground,
+                    contentColor = ColorConstants.ButtonFontColor
+                )
+            ) {
                 Text("Избери")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = ColorConstants.ButtonBackground,
+                    contentColor = ColorConstants.ButtonFontColor
+                )
+            ) {
                 Text("Отказ")
             }
         }
@@ -1028,6 +1084,7 @@ fun SettingsDialog(
     currentFabHidden: Boolean,
     onDismiss: () -> Unit,
     onSave: (String, String, String, String, String, String, String, String, List<String>) -> Unit,
+    onReset: () -> Unit,
     onFabTransparencyChange: (Int) -> Unit,
     onFabHiddenChange: (Boolean) -> Unit
 ) {
@@ -1042,8 +1099,19 @@ fun SettingsDialog(
     var tagsInput by remember { mutableStateOf(currentTags.joinToString(", ")) }
     var fabTransparency by remember { mutableFloatStateOf(currentFabTransparency.toFloat()) }
     var fabHidden by remember { mutableStateOf(currentFabHidden) }
+    val defaultSettingsBg = MaterialTheme.colorScheme.background
+    val defaultSettingsFont = MaterialTheme.colorScheme.onBackground
+    val settingsBg = remember(currentFormBgColor, defaultSettingsBg) {
+        if (currentFormBgColor == "default") defaultSettingsBg else parseColor(currentFormBgColor, defaultSettingsBg)
+    }
+    val settingsFont = remember(currentFontColor, defaultSettingsFont) {
+        if (currentFontColor == "default") defaultSettingsFont else parseColor(currentFontColor, defaultSettingsFont)
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = settingsBg,
+        titleContentColor = settingsFont,
+        textContentColor = settingsFont,
         title = { Text("Настройки") },
         text = {
             Column(
@@ -1056,40 +1124,51 @@ fun SettingsDialog(
                     onColorSelected = { appBg = it }
                 )
                 ColorSelectorRow(
-                    label = "Фон на панели Контакти:",
-                    selectedColor = contactsBg,
-                    onColorSelected = { contactsBg = it }
-                )
-                ColorSelectorRow(
-                    label = "Фон на панели Бележки:",
-                    selectedColor = notesBg,
-                    onColorSelected = { notesBg = it }
-                )
-                ColorSelectorRow(
-                    label = "Фон на форми и настройки:",
-                    selectedColor = formBgColor,
-                    onColorSelected = { formBgColor = it }
-                )
-                ColorSelectorRow(
-                    label = "Цвят на шрифт на форми:",
-                    selectedColor = fontColor,
-                    onColorSelected = { fontColor = it }
-                )
-                ColorSelectorRow(
-                    label = "Основен цвят на темата (Primary):",
+                    label = "Шрифт на приложението:",
                     selectedColor = themePrimary,
                     onColorSelected = { themePrimary = it }
                 )
                 ColorSelectorRow(
-                    label = "Вторичен цвят на темата (Secondary):",
+                    label = "Фон Контакти:",
+                    selectedColor = contactsBg,
+                    onColorSelected = { contactsBg = it }
+                )
+                ColorSelectorRow(
+                    label = "Шрифт Контакти:",
                     selectedColor = themeSecondary,
                     onColorSelected = { themeSecondary = it }
                 )
                 ColorSelectorRow(
-                    label = "Третичен цвят на темата (Tertiary):",
+                    label = "Фон Бележки:",
+                    selectedColor = notesBg,
+                    onColorSelected = { notesBg = it }
+                )
+                ColorSelectorRow(
+                    label = "Шрифт Бележки",
                     selectedColor = themeTertiary,
                     onColorSelected = { themeTertiary = it }
                 )
+                ColorSelectorRow(
+                    label = "Фон на форма",
+                    selectedColor = formBgColor,
+                    onColorSelected = { formBgColor = it }
+                )
+                ColorSelectorRow(
+                    label = "Шрифт на форма",
+                    selectedColor = fontColor,
+                    onColorSelected = { fontColor = it }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = onReset,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ColorConstants.ButtonBackground,
+                        contentColor = ColorConstants.ButtonFontColor
+                    )
+                ) {
+                    Text("Reset цветове")
+                }
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Етикети (до 20, разделени със запетая):", fontWeight = FontWeight.Bold)
                 OutlinedTextField(
@@ -1122,17 +1201,29 @@ fun SettingsDialog(
             }
         },
         confirmButton = {
-            Button(onClick = {
-                val tagsList = tagsInput.split(",").map { it.trim() }.filter { it.isNotEmpty() }.take(20)
-                onFabTransparencyChange(fabTransparency.toInt())
-                onFabHiddenChange(fabHidden)
-                onSave(appBg, contactsBg, notesBg, fontColor, formBgColor, themePrimary, themeSecondary, themeTertiary, tagsList)
-            }) {
+            Button(
+                onClick = {
+                    val tagsList = tagsInput.split(",").map { it.trim() }.filter { it.isNotEmpty() }.take(20)
+                    onFabTransparencyChange(fabTransparency.toInt())
+                    onFabHiddenChange(fabHidden)
+                    onSave(appBg, contactsBg, notesBg, fontColor, formBgColor, themePrimary, themeSecondary, themeTertiary, tagsList)
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = ColorConstants.ButtonBackground,
+                    contentColor = ColorConstants.ButtonFontColor
+                )
+            ) {
                 Text("Запази")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = ColorConstants.ButtonBackground,
+                    contentColor = ColorConstants.ButtonFontColor
+                )
+            ) {
                 Text("Отказ")
             }
         }
