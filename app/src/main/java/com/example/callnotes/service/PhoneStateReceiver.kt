@@ -39,13 +39,17 @@ class PhoneStateReceiver : BroadcastReceiver() {
                             val contact = db.contactDao().findByPhone(phone)
                             Log.d("CXCalls", "PhoneStateReceiver DB lookup: contact=${contact?.displayName ?: "NULL"}")
                             if (contact != null) {
-                                Log.d("CXCalls", "PhoneStateReceiver: KNOWN contact, starting overlay")
-                                val overlayIntent = Intent(context.applicationContext, OverlayService::class.java).apply {
-                                    putExtra(OverlayService.EXTRA_NAME, contact.displayName)
-                                    putExtra(OverlayService.EXTRA_NOTE, contact.note ?: "")
-                                    putExtra(OverlayService.EXTRA_TAGS, contact.tags ?: "")
+                                if (contact.displayName.startsWith("#")) {
+                                    Log.d("CXCalls", "PhoneStateReceiver: Contact excluded (starts with #): ${contact.displayName}")
+                                } else {
+                                    Log.d("CXCalls", "PhoneStateReceiver: KNOWN contact, starting overlay")
+                                    val overlayIntent = Intent(context.applicationContext, OverlayService::class.java).apply {
+                                        putExtra(OverlayService.EXTRA_NAME, contact.displayName)
+                                        putExtra(OverlayService.EXTRA_NOTE, contact.note ?: "")
+                                        putExtra(OverlayService.EXTRA_TAGS, contact.tags ?: "")
+                                    }
+                                    context.applicationContext.startService(overlayIntent)
                                 }
-                                context.applicationContext.startService(overlayIntent)
                             }
                         } catch (e: Exception) {
                             Log.e("CXCalls", "PhoneStateReceiver error", e)
@@ -59,7 +63,6 @@ class PhoneStateReceiver : BroadcastReceiver() {
             }
             TelephonyManager.EXTRA_STATE_IDLE -> {
                 if (wasRinging && incomingNumber != null) {
-                    Log.d("CXCalls", "PhoneStateReceiver: IDLE after call, launching PostCallNoteActivity")
                     val phone = PhoneNumberNormalizer.normalize(incomingNumber!!)
                     val prefs = context.getSharedPreferences("cx_call_notes_prefs", Context.MODE_PRIVATE)
                     CoroutineScope(Dispatchers.IO).launch {
@@ -67,15 +70,21 @@ class PhoneStateReceiver : BroadcastReceiver() {
                         val contact = db.contactDao().findByPhone(phone)
                         val name = contact?.displayName ?: ""
                         prefs.edit().putString("last_call_phone", phone).putString("last_call_name", name).apply()
+
+                        if (!name.startsWith("#")) {
+                            Log.d("CXCalls", "PhoneStateReceiver: IDLE after call, launching PostCallNoteActivity")
+                            try {
+                                context.applicationContext.stopService(Intent(context.applicationContext, OverlayService::class.java))
+                            } catch (_: Exception) {}
+                            val activityIntent = Intent(context.applicationContext, PostCallNoteActivity::class.java).apply {
+                                putExtra(PostCallNoteActivity.EXTRA_PHONE, phone)
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                            }
+                            context.applicationContext.startActivity(activityIntent)
+                        } else {
+                            Log.d("CXCalls", "PhoneStateReceiver: Contact excluded (starts with #), skipping PostCallNoteActivity")
+                        }
                     }
-                    try {
-                        context.applicationContext.stopService(Intent(context.applicationContext, OverlayService::class.java))
-                    } catch (_: Exception) {}
-                    val activityIntent = Intent(context.applicationContext, PostCallNoteActivity::class.java).apply {
-                        putExtra(PostCallNoteActivity.EXTRA_PHONE, phone)
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                    }
-                    context.applicationContext.startActivity(activityIntent)
                 }
                 wasRinging = false
                 incomingNumber = null

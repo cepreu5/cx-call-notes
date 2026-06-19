@@ -14,7 +14,6 @@ data class PostCallNoteUiState(
     val phoneNumber: String = "",
     val callerName: String = "",
     val noteText: String = "",
-    val sessionId: Long? = null,
     val noteId: Long? = null,
     val selectedTags: Set<String> = emptySet(),
     val availableTags: List<String> = emptyList(),
@@ -29,7 +28,7 @@ class PostCallNoteViewModel(
     private val _uiState = MutableStateFlow(PostCallNoteUiState())
     val uiState: StateFlow<PostCallNoteUiState> = _uiState
     private val prefs = context.getSharedPreferences("cx_call_notes_prefs", Context.MODE_PRIVATE)
-    fun init(phone: String, sessionId: Long? = null, noteId: Long? = null) {
+    fun init(phone: String, noteId: Long? = null) {
         val tagsStr = prefs.getString("tags_list", "Клиент,Важно,Партньор,Доставчик,Лично") ?: "Клиент,Важно,Партньор,Доставчик,Лично"
         val availableTags = tagsStr.split(",").map { it.trim() }.filter { it.isNotBlank() }
         var finalPhone = phone
@@ -41,7 +40,6 @@ class PostCallNoteViewModel(
         _uiState.value = _uiState.value.copy(
             phoneNumber = finalPhone,
             callerName = finalName,
-            sessionId = sessionId,
             noteId = noteId,
             availableTags = availableTags
         )
@@ -117,7 +115,7 @@ class PostCallNoteViewModel(
         viewModelScope.launch {
             val s = _uiState.value
             val normPhone = com.example.callnotes.data.PhoneNumberNormalizer.normalize(s.phoneNumber)
-            repository.saveNote(normPhone, s.callerName.ifBlank { null }, s.noteText, s.sessionId)
+            repository.saveNote(normPhone, s.callerName.ifBlank { null }, s.noteText)
             if (s.callerName.isNotBlank()) {
                 val tagsStr = s.selectedTags.joinToString(",")
                 repository.saveContact(

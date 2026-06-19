@@ -113,7 +113,7 @@ class MainViewModel(
         viewModelScope.launch {
             val q = _state.value.searchQuery.trim()
             val allContacts = repository.getAllContacts()
-            val allNotes = repository.getAllNotes()
+            val allNotes = repository.getAllNotes().filter { it.callerName?.startsWith("#") != true }
             val contacts = if (q.isBlank()) {
                 allContacts
             } else {

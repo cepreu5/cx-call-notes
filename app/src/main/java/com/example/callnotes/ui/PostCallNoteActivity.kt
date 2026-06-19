@@ -42,9 +42,8 @@ class PostCallNoteActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val systemHandle = intent.getParcelableExtra<android.net.Uri>(android.telecom.TelecomManager.EXTRA_HANDLE)
         val phone = systemHandle?.schemeSpecificPart ?: intent.getStringExtra(EXTRA_PHONE) ?: ""
-        val sessionId = intent.getLongExtra(EXTRA_SESSION_ID, -1).takeIf { it >= 0 }
         val noteId = intent.getLongExtra(EXTRA_NOTE_ID, -1).takeIf { it >= 0 }
-        viewModel.init(phone, sessionId, noteId)
+        viewModel.init(phone, noteId)
         val prefs = getSharedPreferences("cx_call_notes_prefs", android.content.Context.MODE_PRIVATE)
         val formBg = prefs.getString("form_bg_color", "default") ?: "default"
         val fontCol = prefs.getString("font_color", "default") ?: "default"
@@ -71,7 +70,6 @@ class PostCallNoteActivity : ComponentActivity() {
     }
     companion object {
         const val EXTRA_PHONE = "extra_phone"
-        const val EXTRA_SESSION_ID = "extra_session_id"
         const val EXTRA_NOTE_ID = "extra_note_id"
     }
 }

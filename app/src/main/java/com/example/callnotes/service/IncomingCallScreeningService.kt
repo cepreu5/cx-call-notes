@@ -4,7 +4,6 @@ import android.content.Intent
 import android.telecom.Call
 import android.telecom.CallScreeningService
 import android.util.Log
-import com.example.callnotes.data.CallSessionEntity
 import com.example.callnotes.data.DatabaseProvider
 import com.example.callnotes.data.PhoneNumberNormalizer
 import com.example.callnotes.ui.PostCallNoteActivity
@@ -30,15 +29,6 @@ class IncomingCallScreeningService : CallScreeningService() {
                 val db = DatabaseProvider.get(applicationContext)
                 val contact = db.contactDao().findByPhone(phone)
                 Log.d("CXCalls", "DB lookup result: contact=${contact?.displayName ?: "NULL"}, phone=$phone")
-                val sessionId = db.callSessionDao().insert(
-                    CallSessionEntity(
-                        phoneNumber = phone,
-                        callType = Call.Details.DIRECTION_INCOMING,
-                        screenedKnown = contact != null,
-                        knownContactId = contact?.id
-                    )
-                )
-                Log.d("CXCalls", "Session created: id=$sessionId")
                 respondToCall(
                     details,
                     CallResponse.Builder()
@@ -49,17 +39,23 @@ class IncomingCallScreeningService : CallScreeningService() {
                 )
                 Log.d("CXCalls", "respondToCall done")
                 if (contact != null) {
-                    Log.d("CXCalls", "KNOWN contact: name=${contact.displayName}, note=${contact.note}")
-                    CallUiEvents.emitKnown(phone, contact.displayName, contact.note, sessionId)
-                    Log.d("CXCalls", "Checking overlay permission: ${android.provider.Settings.canDrawOverlays(applicationContext)}")
-                    startOverlay(contact.displayName, contact.note ?: "")
-                    Log.d("CXCalls", "startOverlay called")
+                    if (contact.displayName.startsWith("#")) {
+                        Log.d("CXCalls", "Contact excluded (starts with #): ${contact.displayName}")
+                    } else {
+                        Log.d("CXCalls", "KNOWN contact: name=${contact.displayName}, note=${contact.note}")
+                        CallUiEvents.emitKnown(phone, contact.displayName, contact.note)
+                        Log.d("CXCalls", "Checking overlay permission: ${android.provider.Settings.canDrawOverlays(applicationContext)}")
+                        startOverlay(contact.displayName, contact.note ?: "")
+                        Log.d("CXCalls", "startOverlay called")
+                        startCallWatcher(phone)
+                        Log.d("CXCalls", "startCallWatcher called")
+                    }
                 } else {
                     Log.d("CXCalls", "UNKNOWN contact for phone=$phone")
-                    CallUiEvents.emitUnknown(phone, sessionId)
+                    CallUiEvents.emitUnknown(phone)
+                    startCallWatcher(phone)
+                    Log.d("CXCalls", "startCallWatcher called")
                 }
-                startCallWatcher(phone, sessionId)
-                Log.d("CXCalls", "startCallWatcher called")
             } catch (e: Exception) {
                 Log.e("CXCalls", "Exception in onScreenCall coroutine", e)
             }
@@ -74,7 +70,7 @@ class IncomingCallScreeningService : CallScreeningService() {
         startService(intent)
         Log.d("CXCalls", "OverlayService startService called")
     }
-    private fun startCallWatcher(phone: String, sessionId: Long) {
+    private fun startCallWatcher(phone: String) {
         scope.launch(Dispatchers.Main) {
             callStateWatcher?.stop()
             callStateWatcher = CallStateWatcher(applicationContext) {
@@ -82,7 +78,6 @@ class IncomingCallScreeningService : CallScreeningService() {
                 stopService(Intent(applicationContext, OverlayService::class.java))
                 val intent = Intent(applicationContext, PostCallNoteActivity::class.java).apply {
                     putExtra(PostCallNoteActivity.EXTRA_PHONE, phone)
-                    putExtra(PostCallNoteActivity.EXTRA_SESSION_ID, sessionId)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 }
                 startActivity(intent)
@@ -99,4 +94,3 @@ class IncomingCallScreeningService : CallScreeningService() {
         super.onDestroy()
     }
 }
-

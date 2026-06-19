@@ -11,29 +11,15 @@ class CallNotesRepository(private val db: AppDatabase) {
     suspend fun findNote(id: Long) = db.callNoteDao().findById(id)
     suspend fun searchContacts(query: String) = db.contactDao().search(query)
     suspend fun searchNotes(query: String) = db.callNoteDao().search(query)
-    suspend fun createSession(phone: String, known: ContactEntity?) =
-        db.callSessionDao().insert(
-            CallSessionEntity(
-                phoneNumber = phone,
-                callType = 1,
-                screenedKnown = known != null,
-                knownContactId = known?.id
-            )
-        )
-    suspend fun endSession(sessionId: Long) {
-        db.callSessionDao().markEnded(sessionId, System.currentTimeMillis(), state = 0)
-    }
     suspend fun saveNote(
         phone: String,
         callerName: String?,
-        noteText: String,
-        sessionId: Long? = null
+        noteText: String
     ) = db.callNoteDao().insert(
         CallNoteEntity(
             phoneNumber = phone,
             callerName = callerName,
-            noteText = noteText,
-            callSessionId = sessionId
+            noteText = noteText
         )
     )
     suspend fun updateNoteEntity(note: CallNoteEntity) = db.callNoteDao().update(note)

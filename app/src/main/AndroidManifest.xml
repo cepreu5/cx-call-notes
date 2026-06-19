@@ -36,13 +36,8 @@
 
         <activity
             android:name=".ui.PostCallNoteActivity"
-            android:exported="true"
-            android:theme="@style/Theme.CallNotes">
-            <intent-filter>
-                <action android:name="android.telecom.action.POST_CALL" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </activity>
+            android:exported="false"
+            android:theme="@style/Theme.CallNotes" />
 
         <service
             android:name=".service.OverlayService"

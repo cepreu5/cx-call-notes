@@ -536,20 +536,23 @@ fun ContactCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
+            val nameParts = remember(contact.displayName) { splitNameForFirstLine(contact.displayName) }
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
                 Text(
-                    text = contact.displayName,
+                    text = nameParts.first,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.combinedClickable(
-                        onClick = { onEdit(contact) },
-                        onLongClick = { onSelectSearch(contact.displayName) }
-                    )
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp)
+                        .combinedClickable(
+                            onClick = { onEdit(contact) },
+                            onLongClick = { onSelectSearch(contact.displayName) }
+                        )
                 )
                 Text(
                     text = contact.phoneNumber,
@@ -559,6 +562,20 @@ fun ContactCard(
                         onClick = { onEdit(contact) },
                         onLongClick = { onSelectSearch(contact.phoneNumber) }
                     )
+                )
+            }
+            if (nameParts.second.isNotBlank()) {
+                Text(
+                    text = nameParts.second,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .combinedClickable(
+                            onClick = { onEdit(contact) },
+                            onLongClick = { onSelectSearch(contact.displayName) }
+                        )
                 )
             }
             if (!contact.note.isNullOrBlank()) {
@@ -679,20 +696,23 @@ fun NoteCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
+            val nameParts = remember(note.callerName) { splitNameForFirstLine(note.callerName ?: "Непознат") }
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
                 Text(
-                    text = note.callerName ?: "Непознат",
+                    text = nameParts.first,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = Color(0xFF333333),
-                    modifier = Modifier.combinedClickable(
-                        onClick = { onEdit(note) },
-                        onLongClick = { onSelectSearch(note.callerName ?: "Непознат") }
-                    )
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp)
+                        .combinedClickable(
+                            onClick = { onEdit(note) },
+                            onLongClick = { onSelectSearch(note.callerName ?: "Непознат") }
+                        )
                 )
                 Text(
                     text = note.phoneNumber,
@@ -702,6 +722,20 @@ fun NoteCard(
                         onClick = { onEdit(note) },
                         onLongClick = { onSelectSearch(note.phoneNumber) }
                     )
+                )
+            }
+            if (nameParts.second.isNotBlank()) {
+                Text(
+                    text = nameParts.second,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF333333),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .combinedClickable(
+                            onClick = { onEdit(note) },
+                            onLongClick = { onSelectSearch(note.callerName ?: "Непознат") }
+                        )
                 )
             }
             Spacer(modifier = Modifier.height(4.dp))
@@ -1082,3 +1116,11 @@ fun SettingsDialog(
         }
     )
 }
+
+private fun splitNameForFirstLine(name: String): Pair<String, String> {
+    if (name.length <= MAX_FIRST_LINE_CHARS) return name to ""
+    val breakIndex = name.lastIndexOf(' ', MAX_FIRST_LINE_CHARS).takeIf { it > 0 } ?: MAX_FIRST_LINE_CHARS
+    return name.substring(0, breakIndex) to name.substring(breakIndex).trim()
+}
+
+private const val MAX_FIRST_LINE_CHARS = 18
