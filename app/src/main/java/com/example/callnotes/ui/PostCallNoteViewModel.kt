@@ -30,7 +30,7 @@ class PostCallNoteViewModel(
     val uiState: StateFlow<PostCallNoteUiState> = _uiState
     private val prefs = context.getSharedPreferences("cx_call_notes_prefs", Context.MODE_PRIVATE)
     fun init(phone: String, noteId: Long? = null) {
-        val tagsStr = prefs.getString("tags_list", "Клиент,Важно,Партньор,Доставчик,Лично") ?: "Клиент,Важно,Партньор,Доставчик,Лично"
+        val tagsStr = prefs.getString("tags_list", "Важно,Клиент,Агенция,Строител,Лични") ?: "Важно, Клиент, Агенция, Строител, Лични"
         val availableTags = tagsStr.split(",").map { it.trim() }.filter { it.isNotBlank() }
         var finalPhone = phone
         var finalName = ""

@@ -10,15 +10,15 @@ import androidx.compose.ui.platform.LocalContext
 
 private val LightColorScheme = lightColorScheme(
     primary = ColorConstants.Primary,
-    onPrimary = ColorConstants.OnPrimary,
+    onPrimary = ColorConstants.contrastOn(ColorConstants.Primary),
     secondary = ColorConstants.Secondary,
-    onSecondary = ColorConstants.OnSecondary,
+    onSecondary = ColorConstants.contrastOn(ColorConstants.Secondary),
     tertiary = ColorConstants.Tertiary,
-    onTertiary = ColorConstants.OnTertiary,
+    onTertiary = ColorConstants.contrastOn(ColorConstants.Tertiary),
     background = ColorConstants.Background,
-    onBackground = ColorConstants.OnBackground,
-    surface = ColorConstants.Surface,
-    onSurface = ColorConstants.OnSurface,
+    onBackground = ColorConstants.contrastOn(ColorConstants.Background),
+    surface = ColorConstants.Background,
+    onSurface = ColorConstants.contrastOn(ColorConstants.Background),
     surfaceContainerLow = ColorConstants.SurfaceContainerLow,
     primaryContainer = ColorConstants.PrimaryContainer,
     secondaryContainer = ColorConstants.SecondaryContainer,
@@ -51,8 +51,11 @@ fun CallNotesTheme(
   }
   val dynamicScheme = LightColorScheme.copy(
     primary = parsedPrimary,
+    onPrimary = ColorConstants.contrastOn(parsedPrimary),
     secondary = parsedSecondary,
-    tertiary = parsedTertiary
+    onSecondary = ColorConstants.contrastOn(parsedSecondary),
+    tertiary = parsedTertiary,
+    onTertiary = ColorConstants.contrastOn(parsedTertiary)
   )
   MaterialTheme(colorScheme = dynamicScheme, typography = Typography, content = content)
 }

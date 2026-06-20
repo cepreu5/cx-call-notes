@@ -78,6 +78,7 @@ class PhoneStateReceiver : BroadcastReceiver() {
                             } catch (_: Exception) {}
                             val activityIntent = Intent(context.applicationContext, PostCallNoteActivity::class.java).apply {
                                 putExtra(PostCallNoteActivity.EXTRA_PHONE, phone)
+                                putExtra(PostCallNoteActivity.EXTRA_FROM_CALL, true)
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                             }
                             context.applicationContext.startActivity(activityIntent)

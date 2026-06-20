@@ -1,6 +1,7 @@
 package com.example.callnotes
 
 import android.Manifest
+
 import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
@@ -88,6 +89,7 @@ class MainActivity : ComponentActivity() {
                 var showPostCallNote by remember { mutableStateOf(false) }
                 var shouldMinimize by remember { mutableStateOf(false) }
                 var fromCall by remember { mutableStateOf(false) }
+                var callConfirmPhone by remember { mutableStateOf<Pair<String, String>?>(null) }
                 val snackbarHostState = remember { SnackbarHostState() }
                 val coroutineScope = rememberCoroutineScope()
                 val noteState by noteViewModel.uiState.collectAsState()
@@ -176,6 +178,9 @@ class MainActivity : ComponentActivity() {
                                 fromCall = false
                                 noteViewModel.init("", note.id)
                                 showPostCallNote = true
+                            },
+                            onLongCall = { phone, name ->
+                                callConfirmPhone = phone to name
                             }
                         )
                         if (showSettings) {
@@ -210,12 +215,44 @@ class MainActivity : ComponentActivity() {
                             onFabHiddenChange = { viewModel.saveFabHidden(it) },
                             onReset = {
                                 val ctx = this@MainActivity
-                                ctx.getSharedPreferences("cx_call_notes_prefs", Context.MODE_PRIVATE).edit().clear().apply()
+                                ctx.getSharedPreferences("cx_call_notes_prefs", Context.MODE_PRIVATE).edit().clear().commit()
                                 val restartIntent = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)
                                 ctx.startActivity(restartIntent)
                                 ctx.finish()
                                 Runtime.getRuntime().exit(0)
                             }
+                            )
+                        }
+                        if (callConfirmPhone != null) {
+                            val (phone, name) = callConfirmPhone!!
+                            AlertDialog(
+                                onDismissRequest = { callConfirmPhone = null },
+                                title = { Text("Обаждане") },
+                                text = {
+                                    Text(if (name.isNotBlank()) "Обади се на $name ($phone)?" else "Обади се на $phone?")
+                                },
+                                confirmButton = {
+                                    Button(
+                                        onClick = {
+                                            callConfirmPhone = null
+                                            val intent = Intent(Intent.ACTION_CALL, android.net.Uri.parse("tel:$phone"))
+                                            startActivity(intent)
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = ColorConstants.ButtonBackground,
+                                            contentColor = ColorConstants.ButtonFontColor
+                                        )
+                                    ) { Text("Да") }
+                                },
+                                dismissButton = {
+                                    Button(
+                                        onClick = { callConfirmPhone = null },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = ColorConstants.ButtonBackground,
+                                            contentColor = ColorConstants.ButtonFontColor
+                                        )
+                                    ) { Text("Отказ") }
+                                }
                             )
                         }
                         if (showPostCallNote) {
@@ -322,10 +359,10 @@ class MainActivity : ComponentActivity() {
                                     contentAlignment = Alignment.Center
                                 ) {
                                     when (index) {
-                                        0 -> Icon(Icons.Default.Person, contentDescription = "Контакти", modifier = Modifier.size(18.dp), tint = Color.DarkGray)
-                                        1 -> Icon(Icons.AutoMirrored.Default.Note, contentDescription = "Бележки", modifier = Modifier.size(18.dp), tint = Color.DarkGray)
-                                        2 -> Icon(Icons.Default.Add, contentDescription = "Добави бележка", modifier = Modifier.size(18.dp), tint = Color.DarkGray)
-                                        3 -> Icon(Icons.Default.Settings, contentDescription = "Настройки", modifier = Modifier.size(18.dp), tint = Color.DarkGray)
+                        0 -> Icon(Icons.Default.Person, contentDescription = "Контакти", modifier = Modifier.size(22.dp), tint = Color.DarkGray)
+                        1 -> Icon(Icons.AutoMirrored.Default.Note, contentDescription = "Бележки", modifier = Modifier.size(22.dp), tint = Color.DarkGray)
+                        2 -> Icon(Icons.Default.Add, contentDescription = "Добави бележка", modifier = Modifier.size(22.dp), tint = Color.DarkGray)
+                        3 -> Icon(Icons.Default.Settings, contentDescription = "Настройки", modifier = Modifier.size(22.dp), tint = Color.DarkGray)
                                     }
                                 }
                             }
@@ -334,9 +371,8 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier
                                 .offset { IntOffset(fabXState.toInt(), fabYState.toInt()) }
                                 .size(fabSizeDp)
-                                .shadow(4.dp, CircleShape)
-                                .background(Color.White.copy(alpha = 0.85f * fabAlpha), CircleShape)
-                                .border(1.dp, Color.LightGray.copy(alpha = fabAlpha), CircleShape)
+                                .background(Color.White.copy(alpha = fabAlpha), CircleShape)
+                                .border(1.dp, Color.DarkGray.copy(alpha = 0.4f * fabAlpha), CircleShape)
                                 .pointerInput(showFabMenu) {
                                     if (!showFabMenu) {
                                         detectDragGestures(
@@ -369,7 +405,8 @@ class MainActivity : ComponentActivity() {
         viewModel.load()
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALL_LOG) == PackageManager.PERMISSION_GRANTED &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED
         ) {
             checkOverlayPermission()
         }
@@ -378,10 +415,17 @@ class MainActivity : ComponentActivity() {
         val perms = arrayOf(
             Manifest.permission.READ_PHONE_STATE,
             Manifest.permission.READ_CALL_LOG,
-            Manifest.permission.READ_CONTACTS
+            Manifest.permission.READ_CONTACTS,
+            Manifest.permission.CALL_PHONE
         )
         val needed = perms.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
         if (needed.isNotEmpty()) {
+            val prefs = getSharedPreferences("cx_call_notes_prefs", Context.MODE_PRIVATE)
+            prefs.edit()
+                .remove("theme_primary").remove("theme_secondary").remove("theme_tertiary")
+                .remove("app_bg_color").remove("contacts_bg_color").remove("notes_bg_color")
+                .remove("font_color").remove("form_bg_color")
+                .commit()
             permissionLauncher.launch(needed.toTypedArray())
         } else {
             checkOverlayPermission()
@@ -389,22 +433,26 @@ class MainActivity : ComponentActivity() {
     }
     private fun checkOverlayPermission() {
         if (!android.provider.Settings.canDrawOverlays(this)) {
-            val intent = Intent(
-                android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                android.net.Uri.parse("package:$packageName")
-            )
-            startActivity(intent)
+            try {
+                val intent = Intent(
+                    android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    android.net.Uri.parse("package:$packageName")
+                )
+                startActivity(intent)
+            } catch (_: Exception) {}
         } else {
             requestCallScreeningRole()
         }
     }
     private fun requestCallScreeningRole() {
-        val roleManager = getSystemService(RoleManager::class.java)
-        if (roleManager.isRoleAvailable(RoleManager.ROLE_CALL_SCREENING) &&
-            !roleManager.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
-        ) {
-            roleRequestLauncher.launch(roleManager.createRequestRoleIntent(RoleManager.ROLE_CALL_SCREENING))
-        }
+        try {
+            val roleManager = getSystemService(RoleManager::class.java) ?: return
+            if (roleManager.isRoleAvailable(RoleManager.ROLE_CALL_SCREENING) &&
+                !roleManager.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
+            ) {
+                roleRequestLauncher.launch(roleManager.createRequestRoleIntent(RoleManager.ROLE_CALL_SCREENING))
+            }
+        } catch (_: Exception) {}
     }
 }
 
@@ -425,7 +473,8 @@ fun MainScreen(
     onLoadMoreContacts: () -> Unit,
     onLoadMoreNotes: () -> Unit,
     onEditContact: (ContactEntity) -> Unit,
-    onEditNote: (CallNoteEntity) -> Unit
+    onEditNote: (CallNoteEntity) -> Unit,
+    onLongCall: (String, String) -> Unit
 ) {
     Column {
         OutlinedTextField(
@@ -470,7 +519,8 @@ fun MainScreen(
                 onSelectSearch = onSearchQueryChange,
                 onDelete = onDeleteContact,
                 onLoadMore = onLoadMoreContacts,
-                onEdit = onEditContact
+                onEdit = onEditContact,
+                onLongCall = onLongCall
             )
             1 -> NotesList(
                 notes = state.notes,
@@ -480,7 +530,8 @@ fun MainScreen(
                 onSelectSearch = onSearchQueryChange,
                 onDelete = onDeleteNote,
                 onLoadMore = onLoadMoreNotes,
-                onEdit = onEditNote
+                onEdit = onEditNote,
+                onLongCall = onLongCall
             )
         }
     }
@@ -495,7 +546,8 @@ fun ContactsList(
     onSelectSearch: (String) -> Unit,
     onDelete: (ContactEntity) -> Unit,
     onLoadMore: () -> Unit,
-    onEdit: (ContactEntity) -> Unit
+    onEdit: (ContactEntity) -> Unit,
+    onLongCall: (String, String) -> Unit
 ) {
     if (contacts.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -524,7 +576,7 @@ fun ContactsList(
         ) {
             items(visibleContacts, key = { it.id }) { contact ->
                 SwipeToDeleteWrapper(appBgColor = appBgColor, onDelete = { onDelete(contact) }) {
-                    ContactCard(contact, contactsBgColor, onSelectSearch, onEdit)
+                    ContactCard(contact, contactsBgColor, onSelectSearch, onEdit, onLongCall)
                 }
             }
             if (hasMore) {
@@ -552,7 +604,8 @@ fun ContactCard(
     contact: ContactEntity,
     contactsBgColor: String,
     onSelectSearch: (String) -> Unit,
-    onEdit: (ContactEntity) -> Unit
+    onEdit: (ContactEntity) -> Unit,
+    onLongCall: (String, String) -> Unit
 ) {
     val sdf = remember { SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()) }
     val formattedDate = remember(contact.updatedAt) { sdf.format(Date(contact.updatedAt)) }
@@ -560,12 +613,19 @@ fun ContactCard(
     val cardBg = remember(contactsBgColor) { parseColor(contactsBgColor, defaultCardBg) }
     val tagsList = remember(contact.tags) { contact.tags?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList() }
     Card(
-        modifier = Modifier.fillMaxWidth().clickable { onEdit(contact) },
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = cardBg),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(
+            modifier = Modifier
+                .combinedClickable(
+                    onClick = { onEdit(contact) },
+                    onLongClick = { onLongCall(contact.phoneNumber, contact.displayName) }
+                )
+                .padding(12.dp)
+        ) {
             val nameParts = remember(contact.displayName) { splitNameForFirstLine(contact.displayName) }
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -662,7 +722,8 @@ fun NotesList(
     onSelectSearch: (String) -> Unit,
     onDelete: (CallNoteEntity) -> Unit,
     onLoadMore: () -> Unit,
-    onEdit: (CallNoteEntity) -> Unit
+    onEdit: (CallNoteEntity) -> Unit,
+    onLongCall: (String, String) -> Unit
 ) {
     if (notes.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -691,7 +752,7 @@ fun NotesList(
         ) {
             items(visibleNotes, key = { it.id }) { note ->
                 SwipeToDeleteWrapper(appBgColor = appBgColor, onDelete = { onDelete(note) }) {
-                    NoteCard(note, notesBgColor, onSelectSearch, onEdit)
+                    NoteCard(note, notesBgColor, onSelectSearch, onEdit, onLongCall)
                 }
             }
             if (hasMore) {
@@ -719,19 +780,27 @@ fun NoteCard(
     note: CallNoteEntity,
     notesBgColor: String,
     onSelectSearch: (String) -> Unit,
-    onEdit: (CallNoteEntity) -> Unit
+    onEdit: (CallNoteEntity) -> Unit,
+    onLongCall: (String, String) -> Unit
 ) {
     val sdf = remember { SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()) }
     val formattedDate = remember(note.createdAt) { sdf.format(Date(note.createdAt)) }
-    val defaultCardBg = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+    val defaultCardBg = MaterialTheme.colorScheme.tertiaryContainer
     val cardBg = remember(notesBgColor) { parseColor(notesBgColor, defaultCardBg) }
     Card(
-        modifier = Modifier.fillMaxWidth().clickable { onEdit(note) },
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = cardBg),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(
+            modifier = Modifier
+                .combinedClickable(
+                    onClick = { onEdit(note) },
+                    onLongClick = { onLongCall(note.phoneNumber, note.callerName ?: "") }
+                )
+                .padding(12.dp)
+        ) {
             val nameParts = remember(note.callerName) { splitNameForFirstLine(note.callerName ?: "Непознат") }
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -817,15 +886,18 @@ fun WordSelectableText(text: String, onSelectWord: (String) -> Unit) {
 fun TagChip(tag: String, onSelectSearch: (String) -> Unit) {
     Box(
         modifier = Modifier
-            .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(6.dp))
-            .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(6.dp))
-            .clickable { onSelectSearch(tag) }
+            .background(ColorConstants.TagChipBackground, RoundedCornerShape(6.dp))
+            .border(1.dp, ColorConstants.TagChipBorder, RoundedCornerShape(6.dp))
+            .combinedClickable(
+                onClick = { onSelectSearch(tag) },
+                onLongClick = { onSelectSearch(tag) }
+            )
             .padding(horizontal = 8.dp, vertical = 2.dp)
     ) {
         Text(
             text = tag,
             style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-            color = Color.DarkGray
+            color = ColorConstants.TagChipText
         )
     }
 }
@@ -876,6 +948,7 @@ fun SwipeToDeleteWrapper(appBgColor: String, onDelete: () -> Unit, content: @Com
 fun ColorSelectorRow(
     label: String,
     selectedColor: String,
+    defaultColor: Color,
     onColorSelected: (String) -> Unit
 ) {
     val presets = listOf(
@@ -887,7 +960,7 @@ fun ColorSelectorRow(
     )
     var showPicker by remember { mutableStateOf(false) }
     val currentSelectedBg = remember(selectedColor) {
-        if (selectedColor == "default") Color(0xFF6ED3CF) else parseColor(selectedColor, Color.Gray)
+        if (selectedColor == "default") defaultColor else parseColor(selectedColor, defaultColor)
     }
     Column {
         Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
@@ -936,8 +1009,13 @@ fun ColorSelectorRow(
             }
         }
         if (showPicker) {
+            val hexDefault = String.format("#%02X%02X%02X",
+                (currentSelectedBg.red * 255).toInt(),
+                (currentSelectedBg.green * 255).toInt(),
+                (currentSelectedBg.blue * 255).toInt()
+            )
             CustomColorPickerDialog(
-                initialColor = if (selectedColor.startsWith("#")) selectedColor else "#121212",
+                initialColor = if (selectedColor.startsWith("#")) selectedColor else hexDefault,
                 onDismiss = { showPicker = false },
                 onColorSelected = {
                     onColorSelected(it)
@@ -1121,41 +1199,49 @@ fun SettingsDialog(
                 ColorSelectorRow(
                     label = "Фон на приложението:",
                     selectedColor = appBg,
+                    defaultColor = ColorConstants.Background,
                     onColorSelected = { appBg = it }
                 )
                 ColorSelectorRow(
                     label = "Шрифт на приложението:",
                     selectedColor = themePrimary,
+                    defaultColor = ColorConstants.Primary,
                     onColorSelected = { themePrimary = it }
                 )
                 ColorSelectorRow(
                     label = "Фон Контакти:",
                     selectedColor = contactsBg,
+                    defaultColor = ColorConstants.SurfaceContainerLow,
                     onColorSelected = { contactsBg = it }
                 )
                 ColorSelectorRow(
                     label = "Шрифт Контакти:",
                     selectedColor = themeSecondary,
+                    defaultColor = ColorConstants.Secondary,
                     onColorSelected = { themeSecondary = it }
                 )
                 ColorSelectorRow(
                     label = "Фон Бележки:",
                     selectedColor = notesBg,
+                    defaultColor = ColorConstants.Background,
                     onColorSelected = { notesBg = it }
                 )
                 ColorSelectorRow(
                     label = "Шрифт Бележки",
                     selectedColor = themeTertiary,
+                    defaultColor = ColorConstants.Tertiary,
                     onColorSelected = { themeTertiary = it }
                 )
                 ColorSelectorRow(
                     label = "Фон на форма",
                     selectedColor = formBgColor,
+                    defaultColor = ColorConstants.Background,
                     onColorSelected = { formBgColor = it }
                 )
                 ColorSelectorRow(
                     label = "Шрифт на форма",
                     selectedColor = fontColor,
+                    defaultColor = ColorConstants.contrastOn(ColorConstants.Background),
                     onColorSelected = { fontColor = it }
                 )
                 Spacer(modifier = Modifier.height(8.dp))

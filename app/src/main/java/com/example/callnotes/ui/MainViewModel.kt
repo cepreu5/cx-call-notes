@@ -60,7 +60,7 @@ class MainViewModel(
         val primaryCol = prefs.getString("theme_primary", "default") ?: "default"
         val secondaryCol = prefs.getString("theme_secondary", "default") ?: "default"
         val tertiaryCol = prefs.getString("theme_tertiary", "default") ?: "default"
-        val tagsStr = prefs.getString("tags_list", "Клиент,Важно,Партньор,Доставчик,Лично") ?: "Клиент,Важно,Партньор,Доставчик,Лично"
+        val tagsStr = prefs.getString("tags_list", "Важно,Клиент,Агенция,Строител,Лични") ?: "Важно, Клиент, Агенция, Строител, Лични"
         val tagsList = tagsStr.split(",").filter { it.isNotBlank() }
         val fabX = prefs.getInt("fab_x", -1)
         val fabY = prefs.getInt("fab_y", -1)

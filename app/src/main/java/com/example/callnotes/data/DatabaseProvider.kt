@@ -15,6 +15,6 @@ object DatabaseProvider {
                 context.applicationContext,
                 AppDatabase::class.java,
                 "callnotes.db"
-            ).build().also { instance = it }
+            ).fallbackToDestructiveMigration().build().also { instance = it }
         }
 }
