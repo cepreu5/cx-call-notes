@@ -19,4 +19,8 @@ interface CallNoteDao {
     suspend fun update(note: CallNoteEntity)
     @Delete
     suspend fun delete(note: CallNoteEntity)
+    @Query("DELETE FROM call_notes")
+    suspend fun deleteAll()
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(notes: List<CallNoteEntity>)
 }

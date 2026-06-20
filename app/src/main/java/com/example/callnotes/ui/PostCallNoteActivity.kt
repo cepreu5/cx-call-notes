@@ -1,9 +1,12 @@
 package com.example.callnotes.ui
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,6 +23,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -49,27 +53,105 @@ class PostCallNoteActivity : ComponentActivity() {
         val prefs = getSharedPreferences("cx_call_notes_prefs", android.content.Context.MODE_PRIVATE)
         val formBg = prefs.getString("form_bg_color", "default") ?: "default"
         val fontCol = prefs.getString("font_color", "default") ?: "default"
+        val backupFrequency = prefs.getInt("backup_frequency_days", 7)
+        val lastBackupDate = prefs.getLong("last_backup_date", 0L)
+        val backupDue = (System.currentTimeMillis() - lastBackupDate) > backupFrequency * 24L * 60 * 60 * 1000
         setContent {
             CallNotesTheme {
                 val state by viewModel.uiState.collectAsState()
-                LaunchedEffect(state.saved) {
-                    if (state.saved) finish()
-                }
-                PostCallNoteScreen(
-                    state = state,
-                    formBgColor = formBg,
-                    fontColor = fontCol,
-                    onPhoneChange = viewModel::updatePhoneNumber,
-                    onCallerNameChange = viewModel::updateCallerName,
-                    onNoteTextChange = viewModel::updateNoteText,
-                    onTagToggle = viewModel::toggleTag,
-                    onSave = viewModel::save,
-                    onUpdate = viewModel::updateNote,
-                    onDismiss = {
-                        if (fromCall) moveTaskToBack(true)
-                        finish()
+                var showBackupReminder by remember { mutableStateOf(false) }
+                val repository = (application as CallNotesApp).container.repository
+                val backupLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                    contract = androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
+                ) { uri ->
+                    if (uri != null) {
+                        lifecycleScope.launch {
+                            val success = com.example.callnotes.data.BackupManager.exportIncremental(
+                                this@PostCallNoteActivity, uri, repository, lastBackupDate
+                            )
+                            if (success) {
+                                prefs.edit().putLong("last_backup_date", System.currentTimeMillis()).apply()
+                            }
+                        }
                     }
-                )
+                    if (fromCall) moveTaskToBack(true)
+                    finish()
+                }
+                LaunchedEffect(state.saved) {
+                    if (state.saved) {
+                        if (backupDue) showBackupReminder = true
+                        else {
+                            if (fromCall) moveTaskToBack(true)
+                            finish()
+                        }
+                    }
+                }
+                if (showBackupReminder) {
+                    AlertDialog(
+                        onDismissRequest = {
+                            showBackupReminder = false
+                            if (fromCall) moveTaskToBack(true)
+                            finish()
+                        },
+                        title = { Text("Напомняне за бекъп") },
+                        text = { Text("Последният бекъп е преди повече от $backupFrequency дни. Искате ли да направите бекъп сега?") },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    showBackupReminder = false
+                                    backupLauncher.launch("cx-call-notes-backup.json")
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = ColorConstants.ButtonBackground,
+                                    contentColor = ColorConstants.ButtonFontColor
+                                )
+                            ) { Text("Backup сега") }
+                        },
+                        dismissButton = {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = {
+                                        showBackupReminder = false
+                                        prefs.edit().putLong("last_backup_date", System.currentTimeMillis()).apply()
+                                        if (fromCall) moveTaskToBack(true)
+                                        finish()
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = ColorConstants.ButtonBackground,
+                                        contentColor = ColorConstants.ButtonFontColor
+                                    )
+                                ) { Text("Отложи") }
+                                Button(
+                                    onClick = {
+                                        showBackupReminder = false
+                                        if (fromCall) moveTaskToBack(true)
+                                        finish()
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = ColorConstants.ButtonBackground,
+                                        contentColor = ColorConstants.ButtonFontColor
+                                    )
+                                ) { Text("Отказ") }
+                            }
+                        }
+                    )
+                } else {
+                    PostCallNoteScreen(
+                        state = state,
+                        formBgColor = formBg,
+                        fontColor = fontCol,
+                        onPhoneChange = viewModel::updatePhoneNumber,
+                        onCallerNameChange = viewModel::updateCallerName,
+                        onNoteTextChange = viewModel::updateNoteText,
+                        onTagToggle = viewModel::toggleTag,
+                        onSave = viewModel::save,
+                        onUpdate = viewModel::updateNote,
+                        onDismiss = {
+                            if (fromCall) moveTaskToBack(true)
+                            finish()
+                        }
+                    )
+                }
             }
         }
     }
@@ -127,10 +209,10 @@ fun PostCallNoteScreen(
                 ) {
                     Text(
                         text = when {
-                        state.isEditMode -> "📝 Редактиране"
-                        state.isNewContact -> "📝 Нов контакт"
-                        else -> "📝 Нова бележка"
-                    },
+                            state.isEditMode -> "📝 Редактиране"
+                            state.isNewContact -> "📝 Нов контакт"
+                            else -> "📝 Нова бележка"
+                        },
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         color = parsedFont

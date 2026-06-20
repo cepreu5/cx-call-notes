@@ -17,4 +17,8 @@ interface ContactDao {
     suspend fun search(query: String): List<ContactEntity>
     @Delete
     suspend fun delete(contact: ContactEntity)
+    @Query("DELETE FROM contacts")
+    suspend fun deleteAll()
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(contacts: List<ContactEntity>)
 }

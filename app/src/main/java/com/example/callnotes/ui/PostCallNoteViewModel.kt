@@ -143,7 +143,8 @@ class PostCallNoteViewModel(
                         existing.copy(
                             phoneNumber = normPhone,
                             callerName = s.callerName.ifBlank { null },
-                            noteText = s.noteText
+                            noteText = s.noteText,
+                            updatedAt = System.currentTimeMillis()
                         )
                     )
                 }

@@ -96,6 +96,47 @@ class MainActivity : ComponentActivity() {
                 val prefs = remember { getSharedPreferences("cx_call_notes_prefs", Context.MODE_PRIVATE) }
                 val formBg = remember { prefs.getString("form_bg_color", "default") ?: "default" }
                 val fontCol = remember { prefs.getString("font_color", "default") ?: "default" }
+                val backupLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                    contract = androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
+                ) { uri ->
+                    if (uri != null) {
+                        coroutineScope.launch {
+                            val lastBackup = state.lastBackupDate
+                            val success = if (lastBackup > 0) {
+                                com.example.callnotes.data.BackupManager.exportIncremental(
+                                    this@MainActivity, uri, (application as CallNotesApp).container.repository, lastBackup
+                                )
+                            } else {
+                                com.example.callnotes.data.BackupManager.exportFull(
+                                    this@MainActivity, uri, (application as CallNotesApp).container.repository
+                                )
+                            }
+                            if (success) {
+                                viewModel.updateLastBackupDate(System.currentTimeMillis())
+                                snackbarHostState.showSnackbar("Бекъпът е записан")
+                            } else {
+                                snackbarHostState.showSnackbar("Грешка при запис")
+                            }
+                        }
+                    }
+                }
+                val restoreLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                    contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+                ) { uri ->
+                    if (uri != null) {
+                        coroutineScope.launch {
+                            val success = com.example.callnotes.data.BackupManager.importIncremental(
+                                this@MainActivity, uri, (application as CallNotesApp).container.repository
+                            )
+                            if (success) {
+                                viewModel.load()
+                                snackbarHostState.showSnackbar("Данните са възстановени")
+                            } else {
+                                snackbarHostState.showSnackbar("Грешка при възстановяване")
+                            }
+                        }
+                    }
+                }
                 LaunchedEffect(shouldMinimize) {
                     if (shouldMinimize) {
                         shouldMinimize = false
@@ -196,6 +237,8 @@ class MainActivity : ComponentActivity() {
                                 currentTags = state.tags,
                                 currentFabTransparency = state.fabTransparency,
                                 currentFabHidden = state.fabHidden,
+                                currentBackupFrequency = state.backupFrequency,
+                                currentLastBackupDate = state.lastBackupDate,
                                 onDismiss = { showSettings = false },
                                 onSave = { appBg, contactsBg, notesBg, fontColor, formBg, themePrimary, themeSecondary, themeTertiary, tags ->
                                     val needsRestart = fontColor != state.fontColor ||
@@ -213,6 +256,9 @@ class MainActivity : ComponentActivity() {
                                 },
                             onFabTransparencyChange = { viewModel.saveFabTransparency(it) },
                             onFabHiddenChange = { viewModel.saveFabHidden(it) },
+                            onBackupFrequencyChange = { viewModel.saveBackupFrequency(it) },
+                            onBackupClick = { backupLauncher.launch("cx-call-notes-backup.json") },
+                            onRestoreClick = { restoreLauncher.launch(arrayOf("application/json")) },
                             onReset = {
                                 val ctx = this@MainActivity
                                 ctx.getSharedPreferences("cx_call_notes_prefs", Context.MODE_PRIVATE).edit().clear().commit()
@@ -1160,11 +1206,16 @@ fun SettingsDialog(
     currentTags: List<String>,
     currentFabTransparency: Int,
     currentFabHidden: Boolean,
+    currentBackupFrequency: Int,
+    currentLastBackupDate: Long,
     onDismiss: () -> Unit,
     onSave: (String, String, String, String, String, String, String, String, List<String>) -> Unit,
     onReset: () -> Unit,
+    onBackupClick: () -> Unit,
+    onRestoreClick: () -> Unit,
     onFabTransparencyChange: (Int) -> Unit,
-    onFabHiddenChange: (Boolean) -> Unit
+    onFabHiddenChange: (Boolean) -> Unit,
+    onBackupFrequencyChange: (Int) -> Unit
 ) {
     var appBg by remember { mutableStateOf(currentAppBg) }
     var contactsBg by remember { mutableStateOf(currentContactsBg) }
@@ -1177,6 +1228,7 @@ fun SettingsDialog(
     var tagsInput by remember { mutableStateOf(currentTags.joinToString(", ")) }
     var fabTransparency by remember { mutableFloatStateOf(currentFabTransparency.toFloat()) }
     var fabHidden by remember { mutableStateOf(currentFabHidden) }
+    var backupFrequency by remember { mutableIntStateOf(currentBackupFrequency) }
     val defaultSettingsBg = MaterialTheme.colorScheme.background
     val defaultSettingsFont = MaterialTheme.colorScheme.onBackground
     val settingsBg = remember(currentFormBgColor, defaultSettingsBg) {
@@ -1284,6 +1336,60 @@ fun SettingsDialog(
                     valueRange = 0f..100f,
                     enabled = !fabHidden
                 )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("Бекъп / Рестор", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Честота на бекъп (дни):", modifier = Modifier.weight(1f))
+                    var freqText by remember { mutableStateOf(currentBackupFrequency.toString()) }
+                    OutlinedTextField(
+                        value = freqText,
+                        onValueChange = {
+                            freqText = it.filter { c -> c.isDigit() }
+                            backupFrequency = freqText.toIntOrNull() ?: 7
+                        },
+                        modifier = Modifier.width(80.dp),
+                        singleLine = true
+                    )
+                }
+                val lastBackupSdf = remember { SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()) }
+                val lastBackupText = remember(currentLastBackupDate) {
+                    if (currentLastBackupDate > 0) {
+                        "Последен бекъп: ${lastBackupSdf.format(Date(currentLastBackupDate))}"
+                    } else "Бекъп не е правен"
+                }
+                Text(lastBackupText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { onBackupClick() },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = ColorConstants.ButtonBackground,
+                            contentColor = ColorConstants.ButtonFontColor
+                        )
+                    ) { Text("Backup") }
+                    Button(
+                        onClick = { onRestoreClick() },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = ColorConstants.ButtonBackground,
+                            contentColor = ColorConstants.ButtonFontColor
+                        )
+                    ) { Text("Restore") }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "Последният бекъп записва само промените след предишния",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
             }
         },
         confirmButton = {
@@ -1292,6 +1398,7 @@ fun SettingsDialog(
                     val tagsList = tagsInput.split(",").map { it.trim() }.filter { it.isNotEmpty() }.take(20)
                     onFabTransparencyChange(fabTransparency.toInt())
                     onFabHiddenChange(fabHidden)
+                    onBackupFrequencyChange(backupFrequency)
                     onSave(appBg, contactsBg, notesBg, fontColor, formBgColor, themePrimary, themeSecondary, themeTertiary, tagsList)
                 },
                 colors = ButtonDefaults.buttonColors(

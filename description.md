@@ -1,6 +1,10 @@
 *команда за проверка на грешки:
 .\gradlew.bat compileDebugKotlin --stacktrace --info*
 
+*Разширението xyz.local-history пази всички версии тук:
+C:\Users\Cepreu\AppData\Local\xyz.local-history
+%APPDATA%\Antigravity\User\History*
+
 Резюме:
 Цветове и тема:
 - ColorConstants.kt — оптимизиран, премахнати ненужни стойности, добавен contrastOn() за динамични on-цветове

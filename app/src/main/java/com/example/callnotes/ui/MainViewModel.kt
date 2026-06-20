@@ -35,7 +35,9 @@ data class MainUiState(
     val fabX: Int = -1,
     val fabY: Int = -1,
     val fabTransparency: Int = 100,
-    val fabHidden: Boolean = false
+    val fabHidden: Boolean = false,
+    val backupFrequency: Int = 7,
+    val lastBackupDate: Long = 0L
 )
 
 class MainViewModel(
@@ -66,6 +68,8 @@ class MainViewModel(
         val fabY = prefs.getInt("fab_y", -1)
         val fabTransparency = prefs.getInt("fab_transparency", 100)
         val fabHidden = prefs.getBoolean("fab_hidden", false)
+        val backupFrequency = prefs.getInt("backup_frequency_days", 7)
+        val lastBackupDate = prefs.getLong("last_backup_date", 0L)
         _state.value = _state.value.copy(
             appBgColor = appBg,
             contactsBgColor = contactsBg,
@@ -81,7 +85,9 @@ class MainViewModel(
             fabX = fabX,
             fabY = fabY,
             fabTransparency = fabTransparency,
-            fabHidden = fabHidden
+            fabHidden = fabHidden,
+            backupFrequency = backupFrequency,
+            lastBackupDate = lastBackupDate
         )
     }
     fun saveSettings(appBg: String, contactsBg: String, notesBg: String, fontCol: String, formBg: String, primaryCol: String, secondaryCol: String, tertiaryCol: String, tagsList: List<String>) {
@@ -128,6 +134,20 @@ class MainViewModel(
             apply()
         }
         _state.value = _state.value.copy(fabHidden = hidden)
+    }
+    fun saveBackupFrequency(days: Int) {
+        prefs.edit().apply {
+            putInt("backup_frequency_days", days)
+            apply()
+        }
+        _state.value = _state.value.copy(backupFrequency = days)
+    }
+    fun updateLastBackupDate(date: Long) {
+        prefs.edit().apply {
+            putLong("last_backup_date", date)
+            apply()
+        }
+        _state.value = _state.value.copy(lastBackupDate = date)
     }
     fun load() {
         viewModelScope.launch {
