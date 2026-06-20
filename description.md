@@ -1,6 +1,26 @@
 *команда за проверка на грешки:
 .\gradlew.bat compileDebugKotlin --stacktrace --info*
 
+Резюме:
+Цветове и тема:
+- ColorConstants.kt — оптимизиран, премахнати ненужни стойности, добавен contrastOn() за динамични on-цветове
+- Всички бутони унифицирани (darkGray фон, бял текст)
+- Primary за елементи извън панелите, Secondary за Контакти, Tertiary за Бележки
+- Настройки = фон/шрифт на формата
+UI промени:
+- Икона в хедъра = launcher icon
+- Икона за Бележки = Note (листче) вместо Edit (молив)
+- FAB: 45dp, Quick Ball стил, рамка вместо сянка
+- FAB иконки 22dp
+- TagChip цветове от ColorConstants
+- Settings: квадратчета показват реални default цветове, color picker показва текущия цвят
+Функционалност:
+- Long press → потвърждение за обаждане (с име и номер)
+- Call screening role request с try-catch защити
+- fallbackToDestructiveMigration() върнат за DB
+- Reset цветове → commit() вместо apply()
+- Изчистване на theme цветове при fresh install
+
 Задължителни настройки на Xiaomi:
 1. Autostart
    - Settings → Apps → Manage apps → CX Call Notes → Autostart → Enable
