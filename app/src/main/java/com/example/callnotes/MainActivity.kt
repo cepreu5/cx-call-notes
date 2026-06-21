@@ -101,18 +101,14 @@ class MainActivity : ComponentActivity() {
                 ) { uri ->
                     if (uri != null) {
                         coroutineScope.launch {
-                            val lastBackup = state.lastBackupDate
-                            val success = if (lastBackup > 0) {
-                                com.example.callnotes.data.BackupManager.exportIncremental(
-                                    this@MainActivity, uri, (application as CallNotesApp).container.repository, lastBackup
-                                )
-                            } else {
-                                com.example.callnotes.data.BackupManager.exportFull(
-                                    this@MainActivity, uri, (application as CallNotesApp).container.repository
-                                )
-                            }
+                            val success = com.example.callnotes.data.BackupManager.exportFull(
+                                this@MainActivity, uri, (application as CallNotesApp).container.repository
+                            )
                             if (success) {
-                                viewModel.updateLastBackupDate(System.currentTimeMillis())
+                                prefs.edit()
+                                    .putLong("last_backup_date", System.currentTimeMillis())
+                                    .putString("backup_uri", uri.toString())
+                                    .apply()
                                 snackbarHostState.showSnackbar("Бекъпът е записан")
                             } else {
                                 snackbarHostState.showSnackbar("Грешка при запис")
@@ -125,12 +121,45 @@ class MainActivity : ComponentActivity() {
                 ) { uri ->
                     if (uri != null) {
                         coroutineScope.launch {
-                            val success = com.example.callnotes.data.BackupManager.importIncremental(
+                            val success = com.example.callnotes.data.BackupManager.importFull(
                                 this@MainActivity, uri, (application as CallNotesApp).container.repository
                             )
                             if (success) {
                                 viewModel.load()
                                 snackbarHostState.showSnackbar("Данните са възстановени")
+                            } else {
+                                snackbarHostState.showSnackbar("Грешка при възстановяване")
+                            }
+                        }
+                    }
+                }
+                val settingsBackupLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                    contract = androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
+                ) { uri ->
+                    if (uri != null) {
+                        coroutineScope.launch {
+                            val success = com.example.callnotes.data.BackupManager.exportSettingsOnly(
+                                this@MainActivity, uri
+                            )
+                            if (success) {
+                                snackbarHostState.showSnackbar("Настройките са записани")
+                            } else {
+                                snackbarHostState.showSnackbar("Грешка при запис")
+                            }
+                        }
+                    }
+                }
+                val settingsRestoreLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                    contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+                ) { uri ->
+                    if (uri != null) {
+                        coroutineScope.launch {
+                            val success = com.example.callnotes.data.BackupManager.importSettingsOnly(
+                                this@MainActivity, uri
+                            )
+                            if (success) {
+                                viewModel.loadSettings()
+                                snackbarHostState.showSnackbar("Настройките са възстановени")
                             } else {
                                 snackbarHostState.showSnackbar("Грешка при възстановяване")
                             }
@@ -257,8 +286,37 @@ class MainActivity : ComponentActivity() {
                             onFabTransparencyChange = { viewModel.saveFabTransparency(it) },
                             onFabHiddenChange = { viewModel.saveFabHidden(it) },
                             onBackupFrequencyChange = { viewModel.saveBackupFrequency(it) },
-                            onBackupClick = { backupLauncher.launch("cx-call-notes-backup.json") },
+                            onBackupClick = {
+                                val savedUri = prefs.getString("backup_uri", null)
+                                if (savedUri != null) {
+                                    val uri = android.net.Uri.parse(savedUri)
+                                    coroutineScope.launch {
+                                        val exists = try {
+                                            contentResolver.openInputStream(uri)?.close()
+                                            true
+                                        } catch (_: Exception) { false }
+                                        if (exists) {
+                                            val success = com.example.callnotes.data.BackupManager.exportFull(
+                                                this@MainActivity, uri, (application as CallNotesApp).container.repository
+                                            )
+                                            if (success) {
+                                                prefs.edit().putLong("last_backup_date", System.currentTimeMillis()).apply()
+                                                snackbarHostState.showSnackbar("Бекъпът е записан")
+                                            } else {
+                                                snackbarHostState.showSnackbar("Грешка при запис")
+                                            }
+                                        } else {
+                                            prefs.edit().remove("backup_uri").apply()
+                                            backupLauncher.launch("cx-call-notes-backup.json")
+                                        }
+                                    }
+                                } else {
+                                    backupLauncher.launch("cx-call-notes-backup.json")
+                                }
+                            },
                             onRestoreClick = { restoreLauncher.launch(arrayOf("application/json")) },
+                            onSettingsBackupClick = { settingsBackupLauncher.launch("cx-call-notes-settings.json") },
+                            onSettingsRestoreClick = { settingsRestoreLauncher.launch(arrayOf("application/json")) },
                             onReset = {
                                 val ctx = this@MainActivity
                                 ctx.getSharedPreferences("cx_call_notes_prefs", Context.MODE_PRIVATE).edit().clear().commit()
@@ -1213,6 +1271,8 @@ fun SettingsDialog(
     onReset: () -> Unit,
     onBackupClick: () -> Unit,
     onRestoreClick: () -> Unit,
+    onSettingsBackupClick: () -> Unit,
+    onSettingsRestoreClick: () -> Unit,
     onFabTransparencyChange: (Int) -> Unit,
     onFabHiddenChange: (Boolean) -> Unit,
     onBackupFrequencyChange: (Int) -> Unit
@@ -1386,10 +1446,30 @@ fun SettingsDialog(
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    "Последният бекъп записва само промените след предишния",
+                    "Настройки (отделно)",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline
                 )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { onSettingsBackupClick() },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) { Text("Backup настройки") }
+                    OutlinedButton(
+                        onClick = { onSettingsRestoreClick() },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) { Text("Restore настройки") }
+                }
             }
         },
         confirmButton = {
