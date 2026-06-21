@@ -109,7 +109,7 @@ class MainActivity : ComponentActivity() {
                                     .putLong("last_backup_date", System.currentTimeMillis())
                                     .putString("backup_uri", uri.toString())
                                     .apply()
-                                snackbarHostState.showSnackbar("Бекъпът е записан")
+                                snackbarHostState.showSnackbar("Архивът е записан")
                             } else {
                                 snackbarHostState.showSnackbar("Грешка при запис")
                             }
@@ -301,7 +301,7 @@ class MainActivity : ComponentActivity() {
                                             )
                                             if (success) {
                                                 prefs.edit().putLong("last_backup_date", System.currentTimeMillis()).apply()
-                                                snackbarHostState.showSnackbar("Бекъпът е записан")
+                                                snackbarHostState.showSnackbar("Архивът е записан")
                                             } else {
                                                 snackbarHostState.showSnackbar("Грешка при запис")
                                             }
@@ -1397,32 +1397,8 @@ fun SettingsDialog(
                     enabled = !fabHidden
                 )
                 Spacer(modifier = Modifier.height(12.dp))
-                Text("Бекъп / Рестор", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Честота на бекъп (дни):", modifier = Modifier.weight(1f))
-                    var freqText by remember { mutableStateOf(currentBackupFrequency.toString()) }
-                    OutlinedTextField(
-                        value = freqText,
-                        onValueChange = {
-                            freqText = it.filter { c -> c.isDigit() }
-                            backupFrequency = freqText.toIntOrNull() ?: 7
-                        },
-                        modifier = Modifier.width(80.dp),
-                        singleLine = true
-                    )
-                }
-                val lastBackupSdf = remember { SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()) }
-                val lastBackupText = remember(currentLastBackupDate) {
-                    if (currentLastBackupDate > 0) {
-                        "Последен бекъп: ${lastBackupSdf.format(Date(currentLastBackupDate))}"
-                    } else "Бекъп не е правен"
-                }
-                Text(lastBackupText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
-                Spacer(modifier = Modifier.height(8.dp))
+                Text("Архивиране", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                // Spacer(modifier = Modifier.height(4.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1434,7 +1410,7 @@ fun SettingsDialog(
                             containerColor = ColorConstants.ButtonBackground,
                             contentColor = ColorConstants.ButtonFontColor
                         )
-                    ) { Text("Backup") }
+                    ) { Text("Архив") }
                     Button(
                         onClick = { onRestoreClick() },
                         modifier = Modifier.weight(1f),
@@ -1442,15 +1418,11 @@ fun SettingsDialog(
                             containerColor = ColorConstants.ButtonBackground,
                             contentColor = ColorConstants.ButtonFontColor
                         )
-                    ) { Text("Restore") }
+                    ) { Text("Възст.") }
                 }
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "Настройки (отделно)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline
-                )
-                Spacer(modifier = Modifier.height(4.dp))
+                Text("Настройки", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                // Spacer(modifier = Modifier.height(4.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1461,15 +1433,39 @@ fun SettingsDialog(
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = MaterialTheme.colorScheme.primary
                         )
-                    ) { Text("Backup настройки") }
+                    ) { Text("Архив") }
                     OutlinedButton(
                         onClick = { onSettingsRestoreClick() },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = MaterialTheme.colorScheme.primary
                         )
-                    ) { Text("Restore настройки") }
+                    ) { Text("Възст.") }
                 }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Период (дни):", modifier = Modifier.weight(1f))
+                    var freqText by remember { mutableStateOf(currentBackupFrequency.toString()) }
+                    OutlinedTextField(
+                        value = freqText,
+                        onValueChange = {
+                            freqText = it.filter { c -> c.isDigit() }
+                            backupFrequency = freqText.toIntOrNull() ?: 7
+                        },
+                        modifier = Modifier.width(80.dp),
+                        singleLine = true
+                    )
+                }
+                val lastBackupSdf = remember { SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()) }
+                val lastBackupText = remember(currentLastBackupDate) {
+                    if (currentLastBackupDate > 0) {
+                        "Последен архив: ${lastBackupSdf.format(Date(currentLastBackupDate))}"
+                    } else "Не е правен архив"
+                }
+                Text(lastBackupText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                Spacer(modifier = Modifier.height(8.dp))
             }
         },
         confirmButton = {
