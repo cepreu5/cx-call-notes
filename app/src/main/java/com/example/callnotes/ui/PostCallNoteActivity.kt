@@ -51,13 +51,18 @@ class PostCallNoteActivity : ComponentActivity() {
         val fromCall = intent.getBooleanExtra(EXTRA_FROM_CALL, false)
         viewModel.init(phone, noteId)
         val prefs = getSharedPreferences("cx_call_notes_prefs", android.content.Context.MODE_PRIVATE)
-        val formBg = prefs.getString("form_bg_color", "default") ?: "default"
-        val fontCol = prefs.getString("font_color", "default") ?: "default"
         val backupFrequency = prefs.getInt("backup_frequency_days", 7)
         val lastBackupDate = prefs.getLong("last_backup_date", 0L)
         val backupDue = (System.currentTimeMillis() - lastBackupDate) > backupFrequency * 24L * 60 * 60 * 1000
         setContent {
-            CallNotesTheme {
+            val prefs = getSharedPreferences("cx_call_notes_prefs", android.content.Context.MODE_PRIVATE)
+            CallNotesTheme(
+                themePrimary = prefs.getString("theme_primary", "default") ?: "default",
+                themeSecondary = prefs.getString("theme_secondary", "default") ?: "default",
+                themeTertiary = prefs.getString("theme_tertiary", "default") ?: "default"
+            ) {
+                val formBg = remember { prefs.getString("form_bg_color", "default") ?: "default" }
+                val fontCol = remember { prefs.getString("font_color", "default") ?: "default" }
                 val state by viewModel.uiState.collectAsState()
                 var showBackupReminder by remember { mutableStateOf(false) }
                 val repository = (application as CallNotesApp).container.repository

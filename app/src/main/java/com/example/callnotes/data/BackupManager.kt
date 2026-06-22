@@ -208,10 +208,13 @@ object BackupManager {
         }
     }
 
+    private val excludedKeys = setOf("fab_x", "fab_y", "fab_hidden", "fab_transparency", "backup_uri")
+
     private fun readSettings(context: Context): JSONObject {
         val prefs = context.getSharedPreferences("cx_call_notes_prefs", Context.MODE_PRIVATE)
         return JSONObject().apply {
             for ((key, _) in prefs.all) {
+                if (key in excludedKeys) continue
                 when (val value = prefs.all[key]) {
                     is String -> put(key, value)
                     is Int -> put(key, value)

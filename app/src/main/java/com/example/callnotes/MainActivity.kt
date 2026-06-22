@@ -45,7 +45,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.example.callnotes.data.CallNoteEntity
 import com.example.callnotes.data.ContactEntity
@@ -60,6 +60,18 @@ import com.example.callnotes.ui.PostCallNoteScreen
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.layout.Spacer
+
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.runtime.remember
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels {
@@ -82,8 +94,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         requestPermissionsIfNeeded()
         setContent {
-            CallNotesTheme {
-                val state by viewModel.state.collectAsState()
+            val state by viewModel.state.collectAsState()
+            CallNotesTheme(
+                themePrimary = state.themePrimary,
+                themeSecondary = state.themeSecondary,
+                themeTertiary = state.themeTertiary
+            ) {
                 var showSettings by remember { mutableStateOf(false) }
                 var showFabMenu by remember { mutableStateOf(false) }
                 var showPostCallNote by remember { mutableStateOf(false) }
@@ -278,9 +294,9 @@ class MainActivity : ComponentActivity() {
                                     showSettings = false
                                     viewModel.saveSettings(appBg, contactsBg, notesBg, fontColor, formBg, themePrimary, themeSecondary, themeTertiary, tags)
                                     if (needsRestart) {
-                                        coroutineScope.launch {
-                                            snackbarHostState.showSnackbar("Промените изискват рестарт на приложението", duration = SnackbarDuration.Long)
-                                        }
+                                        //coroutineScope.launch {
+                                        //  snackbarHostState.showSnackbar("Промените изискват рестарт на приложението", duration = SnackbarDuration.Long)
+                                        //}
                                     }
                                 },
                             onFabTransparencyChange = { viewModel.saveFabTransparency(it) },
@@ -584,14 +600,18 @@ fun MainScreen(
         OutlinedTextField(
             value = state.searchQuery,
             onValueChange = onSearchQueryChange,
-            placeholder = { Text("Търсене...") },
+            placeholder = { Text("Търсене...", color = MaterialTheme.colorScheme.primary) },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             shape = RoundedCornerShape(12.dp),
             singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = MaterialTheme.colorScheme.primary,
+                unfocusedTextColor = MaterialTheme.colorScheme.primary
+            ),
             trailingIcon = {
                 if (state.searchQuery.isNotEmpty()) {
                     IconButton(onClick = { onSearchQueryChange("") }) {
-                        Icon(Icons.Default.Clear, contentDescription = "Изчисти")
+                        Icon(Icons.Default.Clear, contentDescription = "Изчисти", tint = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
@@ -1009,19 +1029,48 @@ fun TagChip(tag: String, onSelectSearch: (String) -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SwipeToDeleteWrapper(appBgColor: String, onDelete: () -> Unit, content: @Composable () -> Unit) {
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = {
             if (it == SwipeToDismissBoxValue.StartToEnd) {
-                onDelete()
-                true
+                showDeleteConfirm = true
+                false
             } else {
                 false
             }
         },
-        positionalThreshold = { distance -> distance * 0.8f }
+        positionalThreshold = { distance -> distance * 0.95f }
     )
     val parsedAppBg = remember(appBgColor) {
         if (appBgColor == "default") Color.Transparent else parseColor(appBgColor, Color.Transparent)
+    }
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Изтриване") },
+            text = { Text("Сигурни ли сте?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteConfirm = false
+                        onDelete()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ColorConstants.ButtonBackground,
+                        contentColor = ColorConstants.ButtonFontColor
+                    )
+                ) { Text("Изтрий") }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { showDeleteConfirm = false },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ColorConstants.ButtonBackground,
+                        contentColor = ColorConstants.ButtonFontColor
+                    )
+                ) { Text("Отказ") }
+            }
+        )
     }
     SwipeToDismissBox(
         state = dismissState,
@@ -1250,7 +1299,7 @@ fun CustomColorPickerDialog(
     )
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsDialog(
     currentAppBg: String,
@@ -1302,61 +1351,215 @@ fun SettingsDialog(
         containerColor = settingsBg,
         titleContentColor = settingsFont,
         textContentColor = settingsFont,
-        title = { Text("Настройки") },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(24.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Настройки")
+            }
+        },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                ColorSelectorRow(
-                    label = "Фон на приложението:",
-                    selectedColor = appBg,
-                    defaultColor = ColorConstants.Background,
-                    onColorSelected = { appBg = it }
+                val colorSettings = listOf(
+                    "Основен фон" to appBg,
+                    "Основен шрифт" to themePrimary,
+                    "Фон Контакти" to contactsBg,
+                    "Шрифт Контакти" to themeSecondary,
+                    "Фон Бележки" to notesBg,
+                    "Шрифт Бележки" to themeTertiary,
+                    "Фон на форма" to formBgColor,
+                    "Шрифт на форма" to fontColor
                 )
-                ColorSelectorRow(
-                    label = "Шрифт на приложението:",
-                    selectedColor = themePrimary,
-                    defaultColor = ColorConstants.Primary,
-                    onColorSelected = { themePrimary = it }
+                val colorDefaults = listOf(
+                    ColorConstants.Background, ColorConstants.Primary,
+                    ColorConstants.SurfaceContainerLow, ColorConstants.Secondary,
+                    ColorConstants.Background, ColorConstants.Tertiary,
+                    ColorConstants.Background, ColorConstants.contrastOn(ColorConstants.Background)
                 )
-                ColorSelectorRow(
-                    label = "Фон Контакти:",
-                    selectedColor = contactsBg,
-                    defaultColor = ColorConstants.SurfaceContainerLow,
-                    onColorSelected = { contactsBg = it }
+                var selectedSetting by remember { mutableIntStateOf(0) }
+                var pickerR by remember { mutableIntStateOf(20) }
+                var pickerG by remember { mutableIntStateOf(20) }
+                var pickerB by remember { mutableIntStateOf(20) }
+                var pickerHex by remember { mutableStateOf("#141414") }
+                LaunchedEffect(selectedSetting) {
+                    val hex = colorSettings[selectedSetting].second
+                    val parsed = try {
+                        if (hex == "default") colorDefaults[selectedSetting]
+                        else Color(android.graphics.Color.parseColor(hex))
+                    } catch (_: Exception) { colorDefaults[selectedSetting] }
+                    pickerR = (parsed.red * 255).toInt()
+                    pickerG = (parsed.green * 255).toInt()
+                    pickerB = (parsed.blue * 255).toInt()
+                    pickerHex = String.format("#%02X%02X%02X", pickerR, pickerG, pickerB)
+                }
+                fun applyColor() {
+                    val hex = pickerHex
+                    when (selectedSetting) {
+                        0 -> appBg = hex
+                        1 -> themePrimary = hex
+                        2 -> contactsBg = hex
+                        3 -> themeSecondary = hex
+                        4 -> notesBg = hex
+                        5 -> themeTertiary = hex
+                        6 -> formBgColor = hex
+                        7 -> fontColor = hex
+                    }
+                }
+                val previewBg = try {
+                    val bgHex = if (selectedSetting % 2 == 0) {
+                        colorSettings[selectedSetting].second
+                    } else {
+                        colorSettings[selectedSetting - 1].second
+                    }
+                    if (bgHex == "default") colorDefaults[selectedSetting - (selectedSetting % 2)] else Color(android.graphics.Color.parseColor(bgHex))
+                } catch (_: Exception) { colorDefaults[selectedSetting - (selectedSetting % 2)] }
+                val previewFont = try {
+                    val fontIdx = if (selectedSetting % 2 == 1) selectedSetting else selectedSetting + 1
+                    val fontHex = colorSettings[fontIdx].second
+                    if (fontHex == "default") colorDefaults[fontIdx] else Color(android.graphics.Color.parseColor(fontHex))
+                } catch (_: Exception) { colorDefaults[selectedSetting + 1.coerceAtMost(1)] }
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = CardDefaults.cardColors(containerColor = previewBg)
+                ) {
+                    Text(
+                        text = "Примерен текст",
+                        modifier = Modifier.padding(12.dp),
+                        color = previewFont,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+                var dropdownExpanded by remember { mutableStateOf(false) }
+                ExposedDropdownMenuBox(
+                    expanded = dropdownExpanded,
+                    onExpandedChange = { dropdownExpanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = colorSettings[selectedSetting].first,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Цветове") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = settingsFont, unfocusedTextColor = settingsFont)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = dropdownExpanded,
+                        onDismissRequest = { dropdownExpanded = false }
+                    ) {
+                        colorSettings.forEachIndexed { index, (name, _) ->
+                            DropdownMenuItem(
+                                text = { Text(name, color = settingsFont) },
+                                onClick = {
+                                    selectedSetting = index
+                                    dropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+                val settingsPresets = listOf(
+                    "#F7A8B8", "#F9E79F", "#ABE188", "#F5B67A",
+                    "#C39BD3", "#6ED3CF", "#FF9800", "#FF5722",
+                    "#FFFFFF", "#F5F5F2", "#ECECE8", "#E0E0E0",
+                    "#2A2A28", "#000000"
                 )
-                ColorSelectorRow(
-                    label = "Шрифт Контакти:",
-                    selectedColor = themeSecondary,
-                    defaultColor = ColorConstants.Secondary,
-                    onColorSelected = { themeSecondary = it }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    settingsPresets.take(7).forEach { code ->
+                        val presetColor = try { Color(android.graphics.Color.parseColor(code)) } catch (_: Exception) { Color.Gray }
+                        val isSelected = pickerHex.equals(code, ignoreCase = true)
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(presetColor, CircleShape)
+                                .border(
+                                    width = if (isSelected) 3.dp else 1.dp,
+                                    color = if (isSelected) settingsFont else Color.Gray,
+                                    shape = CircleShape
+                                )
+                                .clickable {
+                                    pickerR = (presetColor.red * 255).toInt()
+                                    pickerG = (presetColor.green * 255).toInt()
+                                    pickerB = (presetColor.blue * 255).toInt()
+                                    pickerHex = code
+                                    applyColor()
+                                }
+                        )
+                    }
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    settingsPresets.drop(7).forEach { code ->
+                        val presetColor = try { Color(android.graphics.Color.parseColor(code)) } catch (_: Exception) { Color.Gray }
+                        val isSelected = pickerHex.equals(code, ignoreCase = true)
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(presetColor, CircleShape)
+                                .border(
+                                    width = if (isSelected) 3.dp else 1.dp,
+                                    color = if (isSelected) settingsFont else Color.Gray,
+                                    shape = CircleShape
+                                )
+                                .clickable {
+                                    pickerR = (presetColor.red * 255).toInt()
+                                    pickerG = (presetColor.green * 255).toInt()
+                                    pickerB = (presetColor.blue * 255).toInt()
+                                    pickerHex = code
+                                    applyColor()
+                                }
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    value = pickerHex,
+                    onValueChange = {
+                        pickerHex = it
+                        if (it.length == 7 && it.startsWith("#")) {
+                            try {
+                                val p = android.graphics.Color.parseColor(it)
+                                pickerR = android.graphics.Color.red(p)
+                                pickerG = android.graphics.Color.green(p)
+                                pickerB = android.graphics.Color.blue(p)
+                                applyColor()
+                            } catch (_: Exception) {}
+                        }
+                    },
+                    label = { Text("HEX", color = settingsFont) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = settingsFont, unfocusedTextColor = settingsFont, focusedLabelColor = settingsFont, unfocusedLabelColor = settingsFont)
                 )
-                ColorSelectorRow(
-                    label = "Фон Бележки:",
-                    selectedColor = notesBg,
-                    defaultColor = ColorConstants.Background,
-                    onColorSelected = { notesBg = it }
-                )
-                ColorSelectorRow(
-                    label = "Шрифт Бележки",
-                    selectedColor = themeTertiary,
-                    defaultColor = ColorConstants.Tertiary,
-                    onColorSelected = { themeTertiary = it }
-                )
-                ColorSelectorRow(
-                    label = "Фон на форма",
-                    selectedColor = formBgColor,
-                    defaultColor = ColorConstants.Background,
-                    onColorSelected = { formBgColor = it }
-                )
-                ColorSelectorRow(
-                    label = "Шрифт на форма",
-                    selectedColor = fontColor,
-                    defaultColor = ColorConstants.contrastOn(ColorConstants.Background),
-                    onColorSelected = { fontColor = it }
-                )
-                Spacer(modifier = Modifier.height(8.dp))
+
+                CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) { //@@
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        
+                        val sharedThumbColor = Color(android.graphics.Color.rgb(pickerR, pickerG, pickerB))
+                        
+                        val updateColors = {
+                            pickerHex = String.format("#%02X%02X%02X", pickerR, pickerG, pickerB)
+                            applyColor()
+                        }
+
+                        // Викаме ги директно без "R", "G", "B" параметъра отпред:
+                        ColorPickerRow(pickerR, { pickerR = it; updateColors() }, Color.Red, sharedThumbColor, settingsFont)
+                        ColorPickerRow(pickerG, { pickerG = it; updateColors() }, Color.Green, sharedThumbColor, settingsFont)
+                        ColorPickerRow(pickerB, { pickerB = it; updateColors() }, Color.Blue, sharedThumbColor, settingsFont)
+                    }
+                }
+
+                // Spacer(modifier = Modifier.height(8.dp))
                 Button(
                     onClick = onReset,
                     modifier = Modifier.fillMaxWidth(),
@@ -1368,11 +1571,11 @@ fun SettingsDialog(
                     Text("Reset цветове")
                 }
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("Етикети (до 20, разделени със запетая):", fontWeight = FontWeight.Bold)
                 OutlinedTextField(
                     value = tagsInput,
                     onValueChange = { tagsInput = it },
-                    label = { Text("Списък етикети") }
+                    label = { Text("Етикети (до 20)", color = settingsFont) },
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = settingsFont, unfocusedTextColor = settingsFont, focusedLabelColor = settingsFont, unfocusedLabelColor = settingsFont)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
@@ -1380,24 +1583,31 @@ fun SettingsDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Checkbox(
-                        checked = fabHidden,
+                        checked = !fabHidden,
                         onCheckedChange = {
-                            fabHidden = it
-                            onFabHiddenChange(it)
+                            fabHidden = !it
+                            onFabHiddenChange(!it)
                         }
                     )
-                    Text("Скрий FAB бутона")
+                    Text("Меню бутон", color = settingsFont)
                 }
-                Text("Прозрачност на FAB: ${fabTransparency.toInt()}%", fontWeight = FontWeight.Bold)
-                Slider(
-                    value = fabTransparency,
-                    onValueChange = { fabTransparency = it },
-                    onValueChangeFinished = { onFabTransparencyChange(fabTransparency.toInt()) },
-                    valueRange = 0f..100f,
-                    enabled = !fabHidden
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("${fabTransparency.toInt()}%", color = settingsFont, modifier = Modifier.width(60.dp))
+                    Slider(
+                        value = fabTransparency,
+                        onValueChange = { fabTransparency = it },
+                        onValueChangeFinished = { onFabTransparencyChange(fabTransparency.toInt()) },
+                        valueRange = 0f..100f,
+                        modifier = Modifier.weight(1f).height(24.dp),
+                        enabled = !fabHidden
+                    )
+                }
                 Spacer(modifier = Modifier.height(12.dp))
-                Text("Архивиране", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                Text("Архивиране", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, color = settingsFont)
                 // Spacer(modifier = Modifier.height(4.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1421,24 +1631,26 @@ fun SettingsDialog(
                     ) { Text("Възст.") }
                 }
                 Spacer(modifier = Modifier.height(4.dp))
-                Text("Настройки", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                Text("Настройки", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, color = settingsFont)
                 // Spacer(modifier = Modifier.height(4.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    OutlinedButton(
+                    Button(
                         onClick = { onSettingsBackupClick() },
                         modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.primary
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = ColorConstants.ButtonBackground,
+                            contentColor = ColorConstants.ButtonFontColor
                         )
                     ) { Text("Архив") }
-                    OutlinedButton(
+                    Button(
                         onClick = { onSettingsRestoreClick() },
                         modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.primary
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = ColorConstants.ButtonBackground,
+                            contentColor = ColorConstants.ButtonFontColor
                         )
                     ) { Text("Възст.") }
                 }
@@ -1446,7 +1658,7 @@ fun SettingsDialog(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Период (дни):", modifier = Modifier.weight(1f))
+                    Text("Периодичност (дни):", modifier = Modifier.weight(1f), color = settingsFont)
                     var freqText by remember { mutableStateOf(currentBackupFrequency.toString()) }
                     OutlinedTextField(
                         value = freqText,
@@ -1454,8 +1666,9 @@ fun SettingsDialog(
                             freqText = it.filter { c -> c.isDigit() }
                             backupFrequency = freqText.toIntOrNull() ?: 7
                         },
-                        modifier = Modifier.width(80.dp),
-                        singleLine = true
+                        modifier = Modifier.width(60.dp),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = settingsFont, unfocusedTextColor = settingsFont, focusedLabelColor = settingsFont, unfocusedLabelColor = settingsFont)
                     )
                 }
                 val lastBackupSdf = remember { SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()) }
@@ -1464,38 +1677,44 @@ fun SettingsDialog(
                         "Последен архив: ${lastBackupSdf.format(Date(currentLastBackupDate))}"
                     } else "Не е правен архив"
                 }
-                Text(lastBackupText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                Text(lastBackupText, style = MaterialTheme.typography.bodySmall, color = settingsFont)
                 Spacer(modifier = Modifier.height(8.dp))
             }
         },
         confirmButton = {
-            Button(
-                onClick = {
-                    val tagsList = tagsInput.split(",").map { it.trim() }.filter { it.isNotEmpty() }.take(20)
-                    onFabTransparencyChange(fabTransparency.toInt())
-                    onFabHiddenChange(fabHidden)
-                    onBackupFrequencyChange(backupFrequency)
-                    onSave(appBg, contactsBg, notesBg, fontColor, formBgColor, themePrimary, themeSecondary, themeTertiary, tagsList)
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = ColorConstants.ButtonBackground,
-                    contentColor = ColorConstants.ButtonFontColor
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Запази")
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ColorConstants.ButtonBackground,
+                        contentColor = ColorConstants.ButtonFontColor
+                    )
+                ) {
+                    Text("Затвори")
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(
+                    onClick = {
+                        val tagsList = tagsInput.split(",").map { it.trim() }.filter { it.isNotEmpty() }.take(20)
+                        onFabTransparencyChange(fabTransparency.toInt())
+                        onFabHiddenChange(fabHidden)
+                        onBackupFrequencyChange(backupFrequency)
+                        onSave(appBg, contactsBg, notesBg, fontColor, formBgColor, themePrimary, themeSecondary, themeTertiary, tagsList)
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ColorConstants.ButtonBackground,
+                        contentColor = ColorConstants.ButtonFontColor
+                    )
+                ) {
+                    Text("Запази")
+                }
             }
         },
-        dismissButton = {
-            Button(
-                onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = ColorConstants.ButtonBackground,
-                    contentColor = ColorConstants.ButtonFontColor
-                )
-            ) {
-                Text("Отказ")
-            }
-        }
+        dismissButton = {}
     )
 }
 
@@ -1506,3 +1725,72 @@ private fun splitNameForFirstLine(name: String): Pair<String, String> {
 }
 
 private const val MAX_FIRST_LINE_CHARS = 18
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ColorPickerRow(
+    channelValue: Int,
+    onValueChange: (Int) -> Unit,
+    activeTrackColor: Color,
+    thumbColor: Color,
+    settingsFont: Color
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        val interactionSource = remember { MutableInteractionSource() }
+        
+        BasicTextField(
+            value = channelValue.toString(),
+            onValueChange = { onValueChange((it.toIntOrNull() ?: 0).coerceIn(0, 255)) },
+            modifier = Modifier
+                .width(60.dp) // Тъй като няма букви, можем да го свием още малко (до 60dp)
+                .height(36.dp), // Фиксирана компактна височина
+            textStyle = TextStyle(color = settingsFont, fontSize = 14.sp),
+            singleLine = true,
+            interactionSource = interactionSource
+        ) { innerTextField ->
+            OutlinedTextFieldDefaults.DecorationBox(
+                value = channelValue.toString(),
+                innerTextField = innerTextField,
+                enabled = true,
+                singleLine = true,
+                visualTransformation = androidx.compose.ui.text.input.VisualTransformation.None,
+                interactionSource = interactionSource,
+                // Премахнати label и placeholder за максимално чист дизайн
+                // Контролираме отстъпите около числото: 8dp отляво, за да не лепи в рамката
+                contentPadding = PaddingValues(start = 8.dp, end = 4.dp, top = 0.dp, bottom = 0.dp), 
+                container = {
+                    OutlinedTextFieldDefaults.Container(
+                        enabled = true,
+                        isError = false,
+                        interactionSource = interactionSource,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = settingsFont,
+                            unfocusedTextColor = settingsFont,
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                }
+            )
+        }
+
+        // Слайдерът се разпъва в останалото пространство
+        Slider(
+            value = channelValue.toFloat(),
+            onValueChange = { onValueChange(it.toInt()) },
+            valueRange = 0f..255f,
+            modifier = Modifier
+                .weight(1f)
+                .height(24.dp),
+            colors = SliderDefaults.colors(
+                thumbColor = thumbColor,
+                activeTrackColor = activeTrackColor
+            )
+        )
+    }
+}
