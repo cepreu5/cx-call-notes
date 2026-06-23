@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="bg">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Настройки – модал</title>
+
+    <!-- Tailwind CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+      body {
+        margin: 0;
+        font-family: Inter, sans-serif;
+        background: #f5f5f5;
+      }
+
+      /* overlay */
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.35);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 50;
+      }
+      .modal-overlay.show {
+        display: flex;
+      }
+
+      /* modal card */
+      .modal-card {
+        width: 100%;
+        max-width: 480px;
+        max-height: 90vh;
+        background: #ffffff;
+        border-radius: 20px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* scrollable middle */
+      .modal-scroll {
+        flex: 1;
+        overflow-y: auto;
+      }
+    </style>
+  </head>
+
+  <body class="flex items-center justify-center min-h-screen bg-[#fafafa]">
+
+    <!-- Бутон за отваряне -->
+    <button
+      id="openSettings"
+      class="rounded-full bg-[#f97316] px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:bg-[#fb923c]"
+    >
+      Отвори настройки
+    </button>
+
+    <!-- MODAL -->
+    <div id="settingsModal" class="modal-overlay">
+      <div class="modal-card">
+
+        <!-- HEADER (sticky) -->
+        <div class="flex w-full items-center justify-between px-6 py-5 sticky top-0 z-10 gap-3 bg-gradient-to-r from-[#f97316] to-[#fb923c]">
+          <div class="flex items-center gap-3">
+            <div class="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-[#ffffff33] text-white">
+              <svg width="20" height="20" viewBox="0 0 24 24">
+                <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                <path d="M19.4 13a7.5 7.5 0 0 0 0-2l2-1.6-2-3.4L17 7a7.6 7.6 0 0 0-1.7-1l-.4-2.5h-4L10.5 6a7.6 7.6 0 0 0-1.7 1L6.4 6l-2 3.4 2 1.6a7.5 7.5 0 0 0 0 2l-2 1.6 2 3.4 2.4-1c.5.4 1.1.7 1.7 1l.4 2.5h4.2l.4-2.5c.6-.3 1.2-.6 1.7-1l2.4 1 2-3.4-2-1.6Z" fill="none" stroke="currentColor" stroke-width="1.8"/>
+              </svg>
+            </div>
+            <span class="text-[20px] font-bold text-white">Настройки</span>
+          </div>
+
+          <button id="closeSettingsHeader" class="flex h-8 w-8 items-center justify-center rounded-full hover:bg-[#ffffff33] text-white">
+            <svg width="20" height="20" viewBox="0 0 24 24">
+              <path d="m6 6 12 12m0-12L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- CONTENT (scrollable) -->
+        <div class="modal-scroll flex w-full flex-col items-stretch bg-[#fafafa] px-6 py-6">
+
+          <!-- Преглед -->
+          <div class="flex w-full flex-col items-start gap-3 rounded-2xl bg-white px-5 py-4 shadow">
+            <span class="text-[11px] font-semibold text-[#a3a3a3] uppercase">Преглед</span>
+            <div class="flex w-full items-center justify-center rounded-xl px-4 py-6 bg-gradient-to-r from-[#f97316] to-[#fb923c]">
+              <span class="text-[14px] font-semibold text-white bg-gradient-to-r from-[#f97316] to-[#fb923c] px-4 py-2 rounded-full">
+                Примерен текст
+              </span>
+            </div>
+          </div>
+
+          <!-- Цветове -->
+          <div class="mt-4 flex w-full flex-col items-start gap-3 rounded-2xl bg-white px-5 py-4 shadow">
+            <span class="text-[11px] font-semibold text-[#a3a3a3] uppercase">Цветове</span>
+            <div class="flex w-full items-center justify-between rounded-xl border border-[#e5e5e5] px-4 py-3 hover:border-[#f97316]">
+              <span class="text-[14px] text-[#171717]">Основен екран</span>
+            </div>
+          </div>
+
+          <!-- Палитра -->
+          <div class="mt-4 flex w-full flex-col items-start gap-4 rounded-2xl bg-white px-5 py-4 shadow">
+            <span class="text-[11px] font-semibold text-[#a3a3a3] uppercase">Палитра</span>
+
+            <!-- Фон -->
+            <div class="flex w-full flex-col gap-2">
+              <span class="text-[12px] font-medium text-[#737373]">Фон</span>
+              <div class="flex w-full items-center gap-1.5">
+                <div class="flex-1 aspect-square rounded-[6px] bg-[#ef4444]"></div>
+                <div class="flex-1 aspect-square rounded-[6px] bg-[#f97316] ring-2 ring-[#ef4444] ring-offset-2"></div>
+                <div class="flex-1 aspect-square rounded-[6px] bg-[#eab308]"></div>
+                <div class="flex-1 aspect-square rounded-[6px] bg-[#22c55e]"></div>
+                <div class="flex-1 aspect-square rounded-[6px] bg-[#14b8a6]"></div>
+                <div class="flex-1 aspect-square rounded-[6px] bg-[#3b82f6]"></div>
+                <div class="flex-1 aspect-square rounded-[6px] bg-[#6366f1]"></div>
+                <div class="flex-1 aspect-square rounded-[6px] bg-[#a855f7]"></div>
+
+                <!-- custom -->
+                <div class="flex-1 aspect-square rounded-[6px] relative bg-[length:8px_8px] bg-[linear-gradient(45deg,#d4d4d4_25%,transparent_25%,transparent_75%,#d4d4d4_75%),linear-gradient(45deg,#d4d4d4_25%,#fff_25%,#fff_75%,#d4d4d4_75%)] [background-position:0_0,4px_4px] ring-2 ring-[#f97316]">
+                  <div class="absolute inset-1 rounded-[3px] bg-[#f97316]"></div>
+                  <div class="absolute inset-0 flex items-center justify-center text-white font-bold text-[12px]">+</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Шрифт -->
+            <div class="flex w-full flex-col gap-2">
+              <span class="text-[12px] font-medium text-[#737373]">Шрифт</span>
+              <div class="flex w-full items-center gap-1.5">
+                <div class="flex-1 aspect-square rounded-[6px] border border-[#e5e5e5] bg-white"></div>
+                <div class="flex-1 aspect-square rounded-[6px] bg-[#e5e5e5]"></div>
+                <div class="flex-1 aspect-square rounded-[6px] bg-[#a3a3a3]"></div>
+                <div class="flex-1 aspect-square rounded-[6px] bg-[#737373]"></div>
+                <div class="flex-1 aspect-square rounded-[6px] bg-[#525252]"></div>
+                <div class="flex-1 aspect-square rounded-[6px] bg-[#262626]"></div>
+                <div class="flex-1 aspect-square rounded-[6px] bg-[#fca5a5]"></div>
+                <div class="flex-1 aspect-square rounded-[6px] bg-[#bfdbfe]"></div>
+
+                <div class="flex-1 aspect-square rounded-[6px] relative bg-[length:8px_8px] bg-[linear-gradient(45deg,#d4d4d4_25%,transparent_25%,transparent_75%,#d4d4d4_75%),linear-gradient(45deg,#d4d4d4_25%,#fff_25%,#fff_75%,#d4d4d4_75%)] [background-position:0_0,4px_4px] ring-2 ring-[#737373]">
+                  <div class="absolute inset-1 rounded-[3px] bg-[#475569]"></div>
+                  <div class="absolute inset-0 flex items-center justify-center text-white text-[10px]">
+                    <svg width="14" height="14" viewBox="0 0 24 24">
+                      <path d="m14 4 6 6L9 21H3v-6z" fill="none" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <span class="text-[12px] text-[#a3a3a3]">Последното квадратче показва вашия избран цвят</span>
+          </div>
+
+          <!-- HEX -->
+          <div class="mt-4 flex w-full flex-col gap-3 rounded-2xl bg-white px-5 py-4 shadow">
+            <span class="text-[11px] font-semibold text-[#a3a3a3] uppercase">HEX</span>
+            <div class="flex w-full items-center gap-3 rounded-xl border border-[#e5e5e5] px-3 py-2">
+              <div class="h-7 w-7 rounded-[8px] bg-[#f97316]"></div>
+              <input class="flex-1 text-[14px] font-medium text-[#262626] outline-none" type="text" placeholder="#F97316">
+            </div>
+          </div>
+
+          <!-- RGB -->
+          <div class="mt-4 flex w-full flex-col gap-4 rounded-2xl bg-white px-5 py-4 shadow">
+            <span class="text-[11px] font-semibold text-[#a3a3a3] uppercase">RGB</span>
+
+            <!-- R -->
+            <div class="flex items-center gap-3">
+              <span class="w-4 text-[13px] font-semibold text-[#737373]">R</span>
+              <div class="flex-1 h-2 bg-[#f5f5f5] rounded-full relative">
+                <div class="absolute left-0 top-0 h-2 bg-[#ef4444] rounded-full" style="width:97%"></div>
+                <div class="absolute left-[97%] top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#ef4444] bg-white shadow"></div>
+              </div>
+              <input class="w-12 text-center rounded-[8px] border border-[#e5e5e5] px-2 py-1 text-[13px]" type="text" placeholder="255">
+            </div>
+
+            <!-- G -->
+            <div class="flex items-center gap-3">
+              <span class="w-4 text-[13px] font-semibold text-[#737373]">G</span>
+              <div class="flex-1 h-2 bg-[#f5f5f5] rounded-full relative">
+                <div class="absolute left-0 top-0 h-2 bg-[#22c55e] rounded-full" style="width:45%"></div>
+                <div class="absolute left-[45%] top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#22c55e] bg-white shadow"></div>
+              </div>
+              <input class="w-12 text-center rounded-[8px] border border-[#e5e5e5] px-2 py-1 text-[13px]" type="text" placeholder="120">
+            </div>
+
+            <!-- B -->
+            <div class="flex items-center gap-3">
+              <span class="w-4 text-[13px] font-semibold text-[#737373]">B</span>
+              <div class="flex-1 h-2 bg-[#f5f5f5] rounded-full relative">
+                <div class="absolute left-0 top-0 h-2 bg-[#3b82f6] rounded-full" style="width:9%"></div>
+                <div class="absolute left-[9%] top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#3b82f6] bg-white shadow"></div>
+              </div>
+              <input class="w-12 text-center rounded-[8px] border border-[#e5e5e5] px-2 py-1 text-[13px]" type="text" placeholder="0">
+            </div>
+          </div>
+
+          <!-- Етикети -->
+          <div class="mt-4 flex w-full flex-col gap-3 rounded-2xl bg-white px-5 py-4 shadow">
+            <div class="flex w-full items-center justify-between">
+              <span class="text-[11px] font-semibold text-[#a3a3a3] uppercase">Етикети (до 20)</span>
+              <span class="text-[11px] font-semibold text-[#737373] bg-[#f5f5f5] px-2 py-0.5 rounded-full">5/20</span>
+            </div>
+            <textarea class="w-full min-h-[72px] rounded-xl border border-[#e5e5e5] px-3 py-2 text-[14px] outline-none resize-none focus:border-[#f97316]"></textarea>
+          </div>
+
+          <!-- Меню бутон -->
+          <div class="mt-4 flex w-full items-center justify-between rounded-2xl bg-white px-5 py-4 shadow">
+            <span class="text-[14px] font-medium text-[#262626]">Меню бутон</span>
+            <div class="h-5 w-5 rounded-[6px] bg-[#f97316] flex items-center justify-center text-white">
+              <svg width="14" height="14" viewBox="0 0 24 24">
+                <path d="m5 12 5 5L20 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Прозрачност -->
+          <div class="mt-4 flex w-full flex-col gap-3 rounded-2xl bg-white px-5 py-4 shadow">
+            <div class="flex w-full items-center justify-between">
+              <span class="text-[11px] font-semibold text-[#a3a3a3] uppercase">Прозрачност</span>
+              <span class="text-[13px] font-semibold text-[#f97316]">51%</span>
+            </div>
+            <div class="h-2 w-full bg-[#f5f5f5] rounded-full relative">
+              <div class="absolute left-0 top-0 h-2 bg-[#f97316] rounded-full" style="width:51%"></div>
+              <div class="absolute left-[51%] top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#f97316] bg-white shadow"></div>
+            </div>
+          </div>
+
+<!-- Архивиране -->
+<div class="mt-4 flex w-full flex-col gap-3 rounded-2xl bg-white px-5 py-4 shadow">
+  <span class="text-[11px] font-semibold text-[#a3a3a3] uppercase">Архивиране</span>
+
+  <div class="flex w-full items-center gap-3">
+    <button class="flex-1 rounded-full bg-[#f5f5f5] px-4 py-2.5 text-[14px] font-semibold text-[#404040] hover:bg-[#e5e5e5]">
+      Архив
+    </button>
+
+    <button class="flex-1 rounded-full bg-[#f5f5f5] px-4 py-2.5 text-[14px] font-semibold text-[#404040] hover:bg-[#e5e5e5]">
+      Възст.
+    </button>
+  </div>
+</div>
+
+<!-- Настройки -->
+<div class="mt-4 flex w-full flex-col gap-3 rounded-2xl bg-white px-5 py-4 shadow">
+  <span class="text-[11px] font-semibold text-[#a3a3a3] uppercase">Настройки</span>
+
+  <div class="flex w-full items-center gap-3">
+    <button class="flex-1 rounded-full bg-[#f5f5f5] px-4 py-2.5 text-[14px] font-semibold text-[#404040] hover:bg-[#e5e5e5]">
+      Архив
+    </button>
+
+    <button class="flex-1 rounded-full bg-[#f5f5f5] px-4 py-2.5 text-[14px] font-semibold text-[#404040] hover:bg-[#e5e5e5]">
+      Възст.
+    </button>
+  </div>
+
+  <div class="flex w-full items-center justify-between gap-3">
+    <span class="text-[14px] font-medium text-[#262626]">Периодичност (дни)</span>
+
+    <input
+      class="w-16 rounded-[8px] border border-[#e5e5e5] px-2 py-1 text-center text-[14px] font-medium text-[#262626] outline-none"
+      type="text"
+      placeholder="7"
+    />
+  </div>
+
+  <span class="text-[12px] text-[#a3a3a3]">Последен архив: 22.06.2026</span>
+</div>
+
+<!-- FOOTER (sticky) -->
+<div class="flex w-full items-center justify-end gap-3 border-t border-[#ffffff33] px-6 py-4 sticky bottom-0 z-10 bg-gradient-to-r from-[#f97316] to-[#fb923c]">
+  <button
+    id="closeSettingsFooter"
+    class="flex items-center justify-center rounded-full px-5 py-2.5 cursor-pointer text-[14px] font-[600] text-white hover:bg-[#ffffff26]"
+  >
+    Затвори
+  </button>
+
+  <button
+    id="saveSettings"
+    class="flex items-center justify-center rounded-full bg-white px-6 py-2.5 shadow-[0px_2px_6px_0px_#0000001a] cursor-pointer text-[14px] font-[700] text-[#f97316] hover:bg-[#fff7ed]"
+  >
+    Запази
+  </button>
+</div>
+
+<script>
+  const modal = document.getElementById('settingsModal');
+  const openBtn = document.getElementById('openSettings');
+  const closeHeader = document.getElementById('closeSettingsHeader');
+  const closeFooter = document.getElementById('closeSettingsFooter');
+  const saveBtn = document.getElementById('saveSettings');
+
+  openBtn.addEventListener('click', () => modal.classList.add('show'));
+
+  function closeModal() {
+    modal.classList.remove('show');
+  }
+
+  closeHeader.addEventListener('click', closeModal);
+  closeFooter.addEventListener('click', closeModal);
+
+  saveBtn.addEventListener('click', () => {
+    console.log('Запази натиснато');
+    closeModal();
+  });
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal();
+  });
+</script>

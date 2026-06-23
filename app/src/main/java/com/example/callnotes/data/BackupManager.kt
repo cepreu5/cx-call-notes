@@ -14,7 +14,6 @@ object BackupManager {
     data class BackupData(
         val contacts: List<ContactEntity>,
         val notes: List<CallNoteEntity>,
-        val settings: JSONObject,
         val backupTime: Long = System.currentTimeMillis()
     )
 
@@ -23,13 +22,11 @@ object BackupManager {
             try {
                 val contacts = repository.getAllContacts()
                 val notes = repository.getAllNotes()
-                val settings = readSettings(context)
 
                 val json = JSONObject().apply {
                     put("backupTime", System.currentTimeMillis())
                     put("contacts", contactsToJson(contacts))
                     put("notes", notesToJson(notes))
-                    put("settings", settings)
                 }
 
                 context.contentResolver.openOutputStream(uri)?.use { stream ->
@@ -47,7 +44,6 @@ object BackupManager {
             try {
                 val contacts = repository.getAllContacts().filter { it.updatedAt > lastBackupDate }
                 val notes = repository.getAllNotes().filter { it.updatedAt > lastBackupDate }
-                val settings = readSettings(context)
 
                 val json = JSONObject().apply {
                     put("backupTime", System.currentTimeMillis())
@@ -55,7 +51,6 @@ object BackupManager {
                     put("sinceDate", lastBackupDate)
                     put("contacts", contactsToJson(contacts))
                     put("notes", notesToJson(notes))
-                    put("settings", settings)
                 }
 
                 context.contentResolver.openOutputStream(uri)?.use { stream ->
@@ -93,10 +88,8 @@ object BackupManager {
                 val json = readJsonFromUri(context, uri) ?: return@withContext false
                 val contacts = jsonToContacts(json.getJSONArray("contacts"))
                 val notes = jsonToNotes(json.getJSONArray("notes"))
-                val settings = json.optJSONObject("settings")
 
                 repository.replaceAll(contacts, notes)
-                if (settings != null) writeSettings(context, settings)
                 true
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -110,10 +103,8 @@ object BackupManager {
                 val json = readJsonFromUri(context, uri) ?: return@withContext false
                 val contacts = jsonToContacts(json.getJSONArray("contacts"))
                 val notes = jsonToNotes(json.getJSONArray("notes"))
-                val settings = json.optJSONObject("settings")
 
                 repository.merge(contacts, notes)
-                if (settings != null) writeSettings(context, settings)
                 true
             } catch (e: Exception) {
                 e.printStackTrace()

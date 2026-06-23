@@ -130,6 +130,10 @@ class MainActivity : ComponentActivity() {
                                 snackbarHostState.showSnackbar("Грешка при запис")
                             }
                         }
+                    } else {
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("Записването е отменено")
+                        }
                     }
                 }
                 val restoreLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -147,6 +151,10 @@ class MainActivity : ComponentActivity() {
                                 snackbarHostState.showSnackbar("Грешка при възстановяване")
                             }
                         }
+                    } else {
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("Възстановяването е отменено")
+                        }
                     }
                 }
                 val settingsBackupLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -162,6 +170,10 @@ class MainActivity : ComponentActivity() {
                             } else {
                                 snackbarHostState.showSnackbar("Грешка при запис")
                             }
+                        }
+                    } else {
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("Записването е отменено")
                         }
                     }
                 }
@@ -179,6 +191,10 @@ class MainActivity : ComponentActivity() {
                             } else {
                                 snackbarHostState.showSnackbar("Грешка при възстановяване")
                             }
+                        }
+                    } else {
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("Възстановяването е отменено")
                         }
                     }
                 }
@@ -303,36 +319,12 @@ class MainActivity : ComponentActivity() {
                             onFabHiddenChange = { viewModel.saveFabHidden(it) },
                             onBackupFrequencyChange = { viewModel.saveBackupFrequency(it) },
                             onBackupClick = {
-                                val savedUri = prefs.getString("backup_uri", null)
-                                if (savedUri != null) {
-                                    val uri = android.net.Uri.parse(savedUri)
-                                    coroutineScope.launch {
-                                        val exists = try {
-                                            contentResolver.openInputStream(uri)?.close()
-                                            true
-                                        } catch (_: Exception) { false }
-                                        if (exists) {
-                                            val success = com.example.callnotes.data.BackupManager.exportFull(
-                                                this@MainActivity, uri, (application as CallNotesApp).container.repository
-                                            )
-                                            if (success) {
-                                                prefs.edit().putLong("last_backup_date", System.currentTimeMillis()).apply()
-                                                snackbarHostState.showSnackbar("Архивът е записан")
-                                            } else {
-                                                snackbarHostState.showSnackbar("Грешка при запис")
-                                            }
-                                        } else {
-                                            prefs.edit().remove("backup_uri").apply()
-                                            backupLauncher.launch("cx-call-notes-backup.json")
-                                        }
-                                    }
-                                } else {
-                                    backupLauncher.launch("cx-call-notes-backup.json")
-                                }
+                                showSettings = false
+                                backupLauncher.launch("cx-call-notes-backup.json")
                             },
-                            onRestoreClick = { restoreLauncher.launch(arrayOf("application/json")) },
-                            onSettingsBackupClick = { settingsBackupLauncher.launch("cx-call-notes-settings.json") },
-                            onSettingsRestoreClick = { settingsRestoreLauncher.launch(arrayOf("application/json")) },
+                            onRestoreClick = { showSettings = false; restoreLauncher.launch(arrayOf("application/json")) },
+                            onSettingsBackupClick = { showSettings = false; settingsBackupLauncher.launch("cx-call-notes-settings.json") },
+                            onSettingsRestoreClick = { showSettings = false; settingsRestoreLauncher.launch(arrayOf("application/json")) },
                             onReset = {
                                 val ctx = this@MainActivity
                                 ctx.getSharedPreferences("cx_call_notes_prefs", Context.MODE_PRIVATE).edit().clear().commit()

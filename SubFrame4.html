@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8" />
+  <title>Настройки – цветове</title>
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    .color-swatch {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      position: relative;
+      flex: 0 0 auto;
+    }
+    .color-swatch.selected {
+      outline: 2px solid #f97316;
+      outline-offset: 2px;
+    }
+    
+.color-swatch .inner {
+  background: transparent;
+  border: none;
+}
+}
+
+  </style>
+</head>
+<body class="min-h-screen bg-[#fafafa] flex items-center justify-center">
+
+  <div class="w-full max-w-md rounded-2xl bg-white shadow px-6 py-6 flex flex-col gap-5">
+
+    <!-- Преглед -->
+    <div class="flex flex-col gap-2">
+      <span class="text-[11px] font-semibold text-[#a3a3a3] uppercase">Преглед</span>
+      <div id="previewBox"
+           class="flex items-center justify-center rounded-xl px-4 py-6"
+           style="background:#f97316; color:#ffffff;">
+        <span class="text-[14px] font-semibold">Примерен текст</span>
+      </div>
+    </div>
+
+<!-- Select за елемент -->
+<div class="flex flex-col gap-2">
+  <span class="text-[11px] font-semibold text-[#a3a3a3] uppercase">Цветове</span>
+
+  <select id="colorTarget"
+          class="w-full rounded-xl border border-[#e5e5e5] px-4 py-3 text-[14px] text-[#171717] outline-none">
+    <option value="main">Основен екран</option>
+    <option value="contacts">Контакти</option>
+    <option value="notes">Бележки</option>
+    <option value="form">Форма</option>
+  </select>
+</div>
+
+    <!-- Палитра -->
+    <div class="flex flex-col gap-4">
+      <span class="text-[11px] font-semibold text-[#a3a3a3] uppercase">Палитра</span>
+
+      <!-- Фон -->
+      <div class="flex flex-col gap-2">
+        <span class="text-[12px] font-medium text-[#737373]">Фон</span>
+        <div id="paletteBg" class="flex flex-wrap gap-1.5">
+          <div class="color-swatch" data-color="#ef4444" style="background:#ef4444"></div>
+          <div class="color-swatch" data-color="#f97316" style="background:#f97316"></div>
+          <div class="color-swatch" data-color="#eab308" style="background:#eab308"></div>
+          <div class="color-swatch" data-color="#22c55e" style="background:#22c55e"></div>
+          <div class="color-swatch" data-color="#14b8a6" style="background:#14b8a6"></div>
+          <div class="color-swatch" data-color="#3b82f6" style="background:#3b82f6"></div>
+          <div class="color-swatch" data-color="#6366f1" style="background:#6366f1"></div>
+          <div class="color-swatch" data-color="#a855f7" style="background:#a855f7"></div>
+          <!-- custom -->
+<div id="customBg"
+     class="color-swatch relative border border-[#d4d4d4] bg-[length:8px_8px] bg-[linear-gradient(45deg,#d4d4d4_25%,transparent_25%,transparent_75%,#d4d4d4_75%),linear-gradient(45deg,#d4d4d4_25%,#fff_25%,#fff_75%,#d4d4d4_75%)] [background-position:0_0,4px_4px]">
+<div class="inner absolute inset-0.5 rounded-[4px]"></div>
+
+</div>
+
+        </div>
+      </div>
+
+      <!-- Шрифт -->
+      <div class="flex flex-col gap-2">
+        <span class="text-[12px] font-medium text-[#737373]">Шрифт</span>
+        <div id="paletteText" class="flex flex-wrap gap-1.5">
+          <div class="color-swatch" data-color="#ffffff" style="background:#ffffff; border:1px solid #e5e5e5"></div>
+          <div class="color-swatch" data-color="#e5e5e5" style="background:#e5e5e5"></div>
+          <div class="color-swatch" data-color="#a3a3a3" style="background:#a3a3a3"></div>
+          <div class="color-swatch" data-color="#737373" style="background:#737373"></div>
+          <div class="color-swatch" data-color="#525252" style="background:#525252"></div>
+          <div class="color-swatch" data-color="#262626" style="background:#262626"></div>
+          <div class="color-swatch" data-color="#fca5a5" style="background:#fca5a5"></div>
+          <div class="color-swatch" data-color="#bfdbfe" style="background:#bfdbfe"></div>
+<div id="customText"
+     class="color-swatch relative border border-[#d4d4d4] bg-[length:8px_8px] bg-[linear-gradient(45deg,#d4d4d4_25%,transparent_25%,transparent_75%,#d4d4d4_75%),linear-gradient(45deg,#d4d4d4_25%,#fff_25%,#fff_75%,#d4d4d4_75%)] [background-position:0_0,4px_4px]">
+<div class="inner absolute inset-0.5 rounded-[4px]"></div>
+
+</div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- HEX -->
+    <div class="flex flex-col gap-2">
+      <span class="text-[11px] font-semibold text-[#a3a3a3] uppercase">HEX (фон)</span>
+      <div class="flex items-center gap-3 rounded-xl border border-[#e5e5e5] px-3 py-2">
+        <div id="hexPreview" class="h-7 w-7 rounded-[8px]" style="background:#f97316"></div>
+        <input id="hexInput"
+               class="flex-1 text-[14px] font-medium text-[#262626] outline-none"
+               type="text"
+               value="#f97316" />
+      </div>
+    </div>
+
+    <!-- RGB + слайдери -->
+    <div class="flex flex-col gap-3">
+      <span class="text-[11px] font-semibold text-[#a3a3a3] uppercase">RGB (фон)</span>
+
+      <!-- R -->
+      <div class="flex items-center gap-3">
+        <span class="w-4 text-[13px] font-semibold text-[#737373]">R</span>
+        <input id="rangeR" type="range" min="0" max="255" value="249" class="flex-1">
+        <input id="rgbR"
+               class="w-12 text-center rounded-[8px] border border-[#e5e5e5] px-2 py-1 text-[13px]"
+               type="number"
+               min="0" max="255"
+               value="249" />
+      </div>
+
+      <!-- G -->
+      <div class="flex items-center gap-3">
+        <span class="w-4 text-[13px] font-semibold text-[#737373]">G</span>
+        <input id="rangeG" type="range" min="0" max="255" value="115" class="flex-1">
+        <input id="rgbG"
+               class="w-12 text-center rounded-[8px] border border-[#e5e5e5] px-2 py-1 text-[13px]"
+               type="number"
+               min="0" max="255"
+               value="115" />
+      </div>
+
+      <!-- B -->
+      <div class="flex items-center gap-3">
+        <span class="w-4 text-[13px] font-semibold text-[#737373]">B</span>
+        <input id="rangeB" type="range" min="0" max="255" value="22" class="flex-1">
+        <input id="rgbB"
+               class="w-12 text-center rounded-[8px] border border-[#e5e5e5] px-2 py-1 text-[13px]"
+               type="number"
+               min="0" max="255"
+               value="22" />
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+// === ELEMENTS ===
+const previewBox = document.getElementById('previewBox');
+
+const paletteBg = document.getElementById('paletteBg');
+const paletteText = document.getElementById('paletteText');
+
+const customBg = document.getElementById('customBg');
+const customText = document.getElementById('customText');
+
+const hexInput = document.getElementById('hexInput');
+const hexPreview = document.getElementById('hexPreview');
+
+const rangeR = document.getElementById('rangeR');
+const rangeG = document.getElementById('rangeG');
+const rangeB = document.getElementById('rangeB');
+
+const rgbR = document.getElementById('rgbR');
+const rgbG = document.getElementById('rgbG');
+const rgbB = document.getElementById('rgbB');
+
+const colorTarget = document.getElementById('colorTarget');
+
+
+// === STATE ===
+let bgColor = '#f97316';
+let textColor = '#ffffff';
+let lastSelected = 'bg';     // 'bg' или 'text'
+let currentTarget = 'main';  // select менюто
+
+
+// === HELPERS ===
+function hexToRgb(hex) {
+  hex = hex.replace('#', '');
+  return {
+    r: parseInt(hex.slice(0, 2), 16),
+    g: parseInt(hex.slice(2, 4), 16),
+    b: parseInt(hex.slice(4, 6), 16),
+  };
+}
+
+function rgbToHex(r, g, b) {
+  return (
+    '#' +
+    [r, g, b]
+      .map((x) => {
+        const h = Number(x).toString(16);
+        return h.length === 1 ? '0' + h : h;
+      })
+      .join('')
+  );
+}
+
+
+// === APPLY FUNCTIONS ===
+function applyBgColor(hex) {
+  bgColor = hex;
+
+  const { r, g, b } = hexToRgb(hex);
+
+  // обновяване на стойностите
+  hexInput.value = hex;
+  hexPreview.style.background = hex;
+
+  rgbR.value = r;
+  rgbG.value = g;
+  rgbB.value = b;
+
+  rangeR.value = r;
+  rangeG.value = g;
+  rangeB.value = b;
+
+  // визуално
+  previewBox.style.background = hex;
+}
+
+function applyTextColor(hex) {
+  textColor = hex;
+  previewBox.style.color = hex;
+}
+
+
+// === PALETTE CLICK HANDLERS ===
+
+// ФОН
+paletteBg.addEventListener('click', (e) => {
+  const sw = e.target.closest('.color-swatch');
+  if (!sw) return;
+
+  const hex = sw.dataset.color;
+
+  // маркиране
+  document.querySelectorAll('#paletteBg .color-swatch')
+    .forEach(el => el.classList.remove('selected'));
+  sw.classList.add('selected');
+
+  lastSelected = 'bg';
+  applyBgColor(hex);
+});
+
+// ШРИФТ
+paletteText.addEventListener('click', (e) => {
+  const sw = e.target.closest('.color-swatch');
+  if (!sw) return;
+
+  const hex = sw.dataset.color;
+
+  // маркиране
+  document.querySelectorAll('#paletteText .color-swatch')
+    .forEach(el => el.classList.remove('selected'));
+  sw.classList.add('selected');
+
+  lastSelected = 'text';
+  applyTextColor(hex);
+});
+
+
+// === CUSTOM SWATCHES ===
+
+// ФОН
+customBg.addEventListener('click', () => {
+  const val = hexInput.value;
+  if (!/^#?[0-9a-fA-F]{6}$/.test(val)) return;
+
+  const hex = val.startsWith('#') ? val : '#' + val;
+
+  // визуално
+  customBg.querySelector('.inner').style.background = hex;
+
+  // маркиране
+  document.querySelectorAll('#paletteBg .color-swatch')
+    .forEach(el => el.classList.remove('selected'));
+  customBg.classList.add('selected');
+
+  lastSelected = 'bg';
+  applyBgColor(hex);
+});
+
+// ШРИФТ
+customText.addEventListener('click', () => {
+  const val = hexInput.value;
+  if (!/^#?[0-9a-fA-F]{6}$/.test(val)) return;
+
+  const hex = val.startsWith('#') ? val : '#' + val;
+
+  // визуално
+  customText.querySelector('.inner').style.background = hex;
+
+  // маркиране
+  document.querySelectorAll('#paletteText .color-swatch')
+    .forEach(el => el.classList.remove('selected'));
+  customText.classList.add('selected');
+
+  lastSelected = 'text';
+  applyTextColor(hex);
+});
+
+
+// === HEX INPUT ===
+hexInput.addEventListener('input', () => {
+  const val = hexInput.value;
+  if (!/^#?[0-9a-fA-F]{6}$/.test(val)) return;
+
+  const hex = val.startsWith('#') ? val : '#' + val;
+
+  if (lastSelected === 'bg') {
+    applyBgColor(hex);
+    customBg.querySelector('.inner').style.background = hex;
+  }
+
+  if (lastSelected === 'text') {
+    applyTextColor(hex);
+    customText.querySelector('.inner').style.background = hex;
+  }
+});
+
+
+// === RGB TEXT INPUTS (НЕ променят фона директно) ===
+function syncFromRgbInputs() {
+  const r = Math.min(255, Math.max(0, Number(rgbR.value || 0)));
+  const g = Math.min(255, Math.max(0, Number(rgbG.value || 0)));
+  const b = Math.min(255, Math.max(0, Number(rgbB.value || 0)));
+
+  const hex = rgbToHex(r, g, b);
+
+  hexInput.value = hex;
+  hexPreview.style.background = hex;
+
+}
+
+rgbR.addEventListener('input', syncFromRgbInputs);
+rgbG.addEventListener('input', syncFromRgbInputs);
+rgbB.addEventListener('input', syncFromRgbInputs);
+
+
+// === RGB SLIDERS (НЕ променят фона директно) ===
+
+rangeR.addEventListener('input', syncFromRange);
+rangeG.addEventListener('input', syncFromRange);
+rangeB.addEventListener('input', syncFromRange);
+
+
+// === SELECT MENU ===
+colorTarget.addEventListener('change', () => {
+  currentTarget = colorTarget.value;
+  console.log('Цветове за:', currentTarget);
+});
+
+
+// === INITIALIZE ===
+applyBgColor(bgColor);
+applyTextColor(textColor);
+
+// маркиране на стартовите квадратчета
+document.querySelectorAll('#paletteBg .color-swatch').forEach(sw => {
+  if (sw.dataset.color === bgColor) sw.classList.add('selected');
+});
+document.querySelectorAll('#paletteText .color-swatch').forEach(sw => {
+  if (sw.dataset.color === textColor) sw.classList.add('selected');
+});
+
+hexPreview.style.background = hex;
+
+function syncFromRange() {
+  const r = Number(rangeR.value);
+  const g = Number(rangeG.value);
+  const b = Number(rangeB.value);
+
+  const hex = rgbToHex(r, g, b);
+
+  rgbR.value = r;
+  rgbG.value = g;
+  rgbB.value = b;
+
+  hexInput.value = hex;
+
+  // 🔥 Добавяме това:
+  hexPreview.style.background = hex;
+
+  // НЕ пипаме previewBox
+  // НЕ пипаме bgColor
+  // НЕ пипаме custom квадратчетата
+}
+
+  </script>
+</body>
+</html>
