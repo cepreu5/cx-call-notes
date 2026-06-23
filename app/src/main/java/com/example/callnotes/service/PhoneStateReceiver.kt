@@ -17,6 +17,7 @@ class PhoneStateReceiver : BroadcastReceiver() {
         private var lastState = TelephonyManager.CALL_STATE_IDLE
         private var incomingNumber: String? = null
         private var wasRinging = false
+        private const val OUTGOING_CALL_TYPE = 3
     }
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != TelephonyManager.ACTION_PHONE_STATE_CHANGED) return
@@ -84,6 +85,36 @@ class PhoneStateReceiver : BroadcastReceiver() {
                             context.applicationContext.startActivity(activityIntent)
                         } else {
                             Log.d("CXCalls", "PhoneStateReceiver: Contact excluded (starts with #), skipping PostCallNoteActivity")
+                        }
+                    }
+                } else if (lastState == TelephonyManager.CALL_STATE_OFFHOOK) {
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val cursor = context.contentResolver.query(
+                            android.provider.CallLog.Calls.CONTENT_URI,
+                            arrayOf(android.provider.CallLog.Calls.NUMBER),
+                            "${android.provider.CallLog.Calls.TYPE} = $OUTGOING_CALL_TYPE",
+                            null,
+                            "${android.provider.CallLog.Calls.DATE} DESC"
+                        )
+                        val phone = cursor?.use {
+                            if (it.moveToFirst()) it.getString(0) else null
+                        }
+                        if (!phone.isNullOrBlank()) {
+                            val normalizedPhone = PhoneNumberNormalizer.normalize(phone)
+                            Log.d("CXCalls", "PhoneStateReceiver: IDLE after outgoing call, phone=$normalizedPhone")
+                            val db = DatabaseProvider.get(context.applicationContext)
+                            val contact = db.contactDao().findByPhone(normalizedPhone)
+                            val name = contact?.displayName ?: ""
+                            val prefs = context.getSharedPreferences("cx_call_notes_prefs", Context.MODE_PRIVATE)
+                            prefs.edit().putString("last_call_phone", normalizedPhone).putString("last_call_name", name).apply()
+                            if (!name.startsWith("#")) {
+                                val activityIntent = Intent(context.applicationContext, PostCallNoteActivity::class.java).apply {
+                                    putExtra(PostCallNoteActivity.EXTRA_PHONE, normalizedPhone)
+                                    putExtra(PostCallNoteActivity.EXTRA_FROM_CALL, true)
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                                }
+                                context.applicationContext.startActivity(activityIntent)
+                            }
                         }
                     }
                 }

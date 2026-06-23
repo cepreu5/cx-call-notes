@@ -125,6 +125,7 @@ class MainActivity : ComponentActivity() {
                                     .putLong("last_backup_date", System.currentTimeMillis())
                                     .putString("backup_uri", uri.toString())
                                     .apply()
+                                viewModel.loadSettings()
                                 snackbarHostState.showSnackbar("Архивът е записан")
                             } else {
                                 snackbarHostState.showSnackbar("Грешка при запис")
