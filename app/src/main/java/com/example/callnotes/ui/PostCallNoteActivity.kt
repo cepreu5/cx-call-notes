@@ -43,13 +43,24 @@ class PostCallNoteActivity : ComponentActivity() {
     private val viewModel: PostCallNoteViewModel by viewModels {
         PostCallNoteViewModelFactory((application as CallNotesApp).container.repository, this)
     }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val phone = intent.getStringExtra(EXTRA_PHONE) ?: ""
+        val noteId = intent.getLongExtra(EXTRA_NOTE_ID, -1).takeIf { it >= 0 }
+        val callDirection = intent.getStringExtra(EXTRA_CALL_DIRECTION)
+        if (phone.isNotBlank() || noteId != null) {
+            viewModel.init(phone, noteId, callDirection)
+        }
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val systemHandle = intent.getParcelableExtra<android.net.Uri>(android.telecom.TelecomManager.EXTRA_HANDLE)
         val phone = systemHandle?.schemeSpecificPart ?: intent.getStringExtra(EXTRA_PHONE) ?: ""
         val noteId = intent.getLongExtra(EXTRA_NOTE_ID, -1).takeIf { it >= 0 }
         val fromCall = intent.getBooleanExtra(EXTRA_FROM_CALL, false)
-        viewModel.init(phone, noteId)
+        val callDirection = intent.getStringExtra(EXTRA_CALL_DIRECTION)
+        viewModel.init(phone, noteId, callDirection)
         val prefs = getSharedPreferences("cx_call_notes_prefs", android.content.Context.MODE_PRIVATE)
         val backupFrequency = prefs.getInt("backup_frequency_days", 7)
         val lastBackupDate = prefs.getLong("last_backup_date", 0L)
@@ -192,6 +203,7 @@ class PostCallNoteActivity : ComponentActivity() {
         const val EXTRA_PHONE = "extra_phone"
         const val EXTRA_NOTE_ID = "extra_note_id"
         const val EXTRA_FROM_CALL = "extra_from_call"
+        const val EXTRA_CALL_DIRECTION = "extra_call_direction"
     }
 }
 

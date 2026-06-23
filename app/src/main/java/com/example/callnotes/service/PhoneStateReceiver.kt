@@ -80,6 +80,7 @@ class PhoneStateReceiver : BroadcastReceiver() {
                             val activityIntent = Intent(context.applicationContext, PostCallNoteActivity::class.java).apply {
                                 putExtra(PostCallNoteActivity.EXTRA_PHONE, phone)
                                 putExtra(PostCallNoteActivity.EXTRA_FROM_CALL, true)
+                                putExtra(PostCallNoteActivity.EXTRA_CALL_DIRECTION, "incoming")
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                             }
                             context.applicationContext.startActivity(activityIntent)
@@ -111,6 +112,7 @@ class PhoneStateReceiver : BroadcastReceiver() {
                                 val activityIntent = Intent(context.applicationContext, PostCallNoteActivity::class.java).apply {
                                     putExtra(PostCallNoteActivity.EXTRA_PHONE, normalizedPhone)
                                     putExtra(PostCallNoteActivity.EXTRA_FROM_CALL, true)
+                                    putExtra(PostCallNoteActivity.EXTRA_CALL_DIRECTION, "outgoing")
                                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                                 }
                                 context.applicationContext.startActivity(activityIntent)

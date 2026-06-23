@@ -37,7 +37,8 @@ data class MainUiState(
     val fabTransparency: Int = 100,
     val fabHidden: Boolean = false,
     val backupFrequency: Int = 7,
-    val lastBackupDate: Long = 0L
+    val lastBackupDate: Long = 0L,
+    val callDirectionFilter: String? = null
 )
 
 class MainViewModel(
@@ -152,37 +153,50 @@ class MainViewModel(
     fun load() {
         viewModelScope.launch {
             val q = _state.value.searchQuery.trim()
+            val filter = _state.value.callDirectionFilter
             val allContacts = repository.getAllContacts()
             val allNotes = repository.getAllNotes().filter { it.callerName?.startsWith("#") != true }
-            val contacts = if (q.isBlank()) {
-                allContacts
-            } else {
-                val isDate = q.matches(Regex("\\d{2}\\.\\d{2}\\.\\d{4}"))
-                allContacts.filter { c ->
+            val contacts = allContacts.filter { c ->
+                val matchesSearch = q.isBlank() || run {
+                    val isDate = q.matches(Regex("\\d{2}\\.\\d{2}\\.\\d{4}"))
                     if (isDate) {
                         SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(Date(c.updatedAt)) == q
                     } else {
                         c.displayName.contains(q, true) || c.phoneNumber.contains(q, true) || (c.note?.contains(q, true) == true) || (c.tags?.contains(q, true) == true)
                     }
                 }
+                val matchesDirection = filter == null || run {
+                    val prefix = com.example.callnotes.ui.PostCallNoteUiState.getDirectionPrefix(filter)
+                    prefix != null && c.note?.startsWith(prefix) == true
+                }
+                matchesSearch && matchesDirection
             }
-            val notes = if (q.isBlank()) {
-                allNotes
-            } else {
-                val isDate = q.matches(Regex("\\d{2}\\.\\d{2}\\.\\d{4}"))
-                allNotes.filter { n ->
+            val notes = allNotes.filter { n ->
+                val matchesSearch = q.isBlank() || run {
+                    val isDate = q.matches(Regex("\\d{2}\\.\\d{2}\\.\\d{4}"))
                     if (isDate) {
                         SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(Date(n.createdAt)) == q
                     } else {
                         (n.callerName?.contains(q, true) == true) || n.phoneNumber.contains(q, true) || n.noteText.contains(q, true)
                     }
                 }
+                val matchesDirection = filter == null || run {
+                    val prefix = com.example.callnotes.ui.PostCallNoteUiState.getDirectionPrefix(filter)
+                    prefix != null && n.noteText.startsWith(prefix)
+                }
+                matchesSearch && matchesDirection
             }
             _state.value = _state.value.copy(
                 contacts = contacts,
                 notes = notes
             )
         }
+    }
+    fun toggleCallDirectionFilter(direction: String?) {
+        _state.value = _state.value.copy(
+            callDirectionFilter = if (_state.value.callDirectionFilter == direction) null else direction
+        )
+        load()
     }
     fun updateSearchQuery(query: String) {
         _state.value = _state.value.copy(searchQuery = query)

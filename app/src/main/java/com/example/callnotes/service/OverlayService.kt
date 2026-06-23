@@ -34,8 +34,9 @@ class OverlayService : Service() {
         val name = intent?.getStringExtra(EXTRA_NAME) ?: "Unknown"
         val note = intent?.getStringExtra(EXTRA_NOTE) ?: ""
         val tags = intent?.getStringExtra(EXTRA_TAGS) ?: ""
-        Log.d("CXCalls", "OverlayService: name=$name, note=$note, tags=$tags")
-        showOverlay(name, note, tags)
+        val displayNote = com.example.callnotes.ui.PostCallNoteUiState.stripDirectionPrefix(note)
+        Log.d("CXCalls", "OverlayService: name=$name, note=$displayNote, tags=$tags")
+        showOverlay(name, displayNote, tags)
         return START_NOT_STICKY
     }
 

@@ -29,6 +29,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.automirrored.filled.CallMade
+import androidx.compose.material.icons.automirrored.filled.CallReceived
 import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
@@ -284,7 +286,8 @@ class MainActivity : ComponentActivity() {
                             },
                             onLongCall = { phone, name ->
                                 callConfirmPhone = phone to name
-                            }
+                            },
+                            onCallDirectionFilter = viewModel::toggleCallDirectionFilter
                         )
                         if (showSettings) {
                             SettingsDialog(
@@ -587,7 +590,8 @@ fun MainScreen(
     onLoadMoreNotes: () -> Unit,
     onEditContact: (ContactEntity) -> Unit,
     onEditNote: (CallNoteEntity) -> Unit,
-    onLongCall: (String, String) -> Unit
+    onLongCall: (String, String) -> Unit,
+    onCallDirectionFilter: (String?) -> Unit
 ) {
     Column {
         OutlinedTextField(
@@ -627,6 +631,25 @@ fun MainScreen(
                 icon = { Icon(Icons.AutoMirrored.Default.Note, contentDescription = null) }
             )
         }
+        if (state.callDirectionFilter != null) {
+            val label = if (state.callDirectionFilter == "incoming") "Входящи обаждания" else "Изходящи обаждания"
+            val icon = if (state.callDirectionFilter == "incoming") Icons.AutoMirrored.Filled.CallReceived else Icons.AutoMirrored.Filled.CallMade
+            Surface(
+                modifier = Modifier.fillMaxWidth().clickable { onCallDirectionFilter(null) },
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Spacer(modifier = Modifier.weight(1f))
+                    Icon(Icons.Default.Clear, contentDescription = "Изчисти филтър", tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(16.dp))
+                }
+            }
+        }
         when (state.selectedTab) {
             0 -> ContactsList(
                 contacts = state.contacts,
@@ -637,7 +660,8 @@ fun MainScreen(
                 onDelete = onDeleteContact,
                 onLoadMore = onLoadMoreContacts,
                 onEdit = onEditContact,
-                onLongCall = onLongCall
+                onLongCall = onLongCall,
+                onCallDirectionFilter = onCallDirectionFilter
             )
             1 -> NotesList(
                 notes = state.notes,
@@ -648,7 +672,8 @@ fun MainScreen(
                 onDelete = onDeleteNote,
                 onLoadMore = onLoadMoreNotes,
                 onEdit = onEditNote,
-                onLongCall = onLongCall
+                onLongCall = onLongCall,
+                onCallDirectionFilter = onCallDirectionFilter
             )
         }
     }
@@ -664,7 +689,8 @@ fun ContactsList(
     onDelete: (ContactEntity) -> Unit,
     onLoadMore: () -> Unit,
     onEdit: (ContactEntity) -> Unit,
-    onLongCall: (String, String) -> Unit
+    onLongCall: (String, String) -> Unit,
+    onCallDirectionFilter: (String?) -> Unit
 ) {
     if (contacts.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -693,7 +719,7 @@ fun ContactsList(
         ) {
             items(visibleContacts, key = { it.id }) { contact ->
                 SwipeToDeleteWrapper(appBgColor = appBgColor, onDelete = { onDelete(contact) }) {
-                    ContactCard(contact, contactsBgColor, onSelectSearch, onEdit, onLongCall)
+                    ContactCard(contact, contactsBgColor, onSelectSearch, onEdit, onLongCall, onCallDirectionFilter)
                 }
             }
             if (hasMore) {
@@ -722,13 +748,21 @@ fun ContactCard(
     contactsBgColor: String,
     onSelectSearch: (String) -> Unit,
     onEdit: (ContactEntity) -> Unit,
-    onLongCall: (String, String) -> Unit
+    onLongCall: (String, String) -> Unit,
+    onCallDirectionFilter: (String?) -> Unit
 ) {
     val sdf = remember { SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()) }
     val formattedDate = remember(contact.updatedAt) { sdf.format(Date(contact.updatedAt)) }
     val defaultCardBg = MaterialTheme.colorScheme.surfaceContainerLow
     val cardBg = remember(contactsBgColor) { parseColor(contactsBgColor, defaultCardBg) }
     val tagsList = remember(contact.tags) { contact.tags?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList() }
+    val callDirection = remember(contact.note) {
+        when {
+            contact.note?.startsWith(com.example.callnotes.ui.PostCallNoteUiState.PREFIX_INCOMING) == true -> "incoming"
+            contact.note?.startsWith(com.example.callnotes.ui.PostCallNoteUiState.PREFIX_OUTGOING) == true -> "outgoing"
+            else -> null
+        }
+    }
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -748,6 +782,23 @@ fun ContactCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top
             ) {
+                if (callDirection != null) {
+                    val dirIcon = if (callDirection == "incoming") Icons.AutoMirrored.Filled.CallReceived else Icons.AutoMirrored.Filled.CallMade
+                    // val dirColor = if (callDirection == "incoming") Color(0xFF4CAF50) else Color(0xFF2196F3)
+                    Icon(
+                        dirIcon,
+                        contentDescription = if (callDirection == "incoming") "Входящо" else "Изходящо",
+                        // tint = dirColor,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .padding(top = 2.dp)
+                            .combinedClickable(
+                                onClick = {},
+                                onLongClick = { onCallDirectionFilter(callDirection) }
+                            )
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
                 Text(
                     text = nameParts.first,
                     style = MaterialTheme.typography.titleMedium,
@@ -786,16 +837,17 @@ fun ContactCard(
                 )
             }
             if (!contact.note.isNullOrBlank()) {
+                val displayNote = com.example.callnotes.ui.PostCallNoteUiState.stripDirectionPrefix(contact.note)
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = contact.note,
+                    text = displayNote,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.secondary,
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     modifier = Modifier.combinedClickable(
                         onClick = { onEdit(contact) },
-                        onLongClick = { onSelectSearch(contact.note) }
+                        onLongClick = { onSelectSearch(displayNote) }
                     )
                 )
             }
@@ -840,7 +892,8 @@ fun NotesList(
     onDelete: (CallNoteEntity) -> Unit,
     onLoadMore: () -> Unit,
     onEdit: (CallNoteEntity) -> Unit,
-    onLongCall: (String, String) -> Unit
+    onLongCall: (String, String) -> Unit,
+    onCallDirectionFilter: (String?) -> Unit
 ) {
     if (notes.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -869,7 +922,7 @@ fun NotesList(
         ) {
             items(visibleNotes, key = { it.id }) { note ->
                 SwipeToDeleteWrapper(appBgColor = appBgColor, onDelete = { onDelete(note) }) {
-                    NoteCard(note, notesBgColor, onSelectSearch, onEdit, onLongCall)
+                    NoteCard(note, notesBgColor, onSelectSearch, onEdit, onLongCall, onCallDirectionFilter)
                 }
             }
             if (hasMore) {
@@ -898,12 +951,20 @@ fun NoteCard(
     notesBgColor: String,
     onSelectSearch: (String) -> Unit,
     onEdit: (CallNoteEntity) -> Unit,
-    onLongCall: (String, String) -> Unit
+    onLongCall: (String, String) -> Unit,
+    onCallDirectionFilter: (String?) -> Unit
 ) {
     val sdf = remember { SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()) }
     val formattedDate = remember(note.createdAt) { sdf.format(Date(note.createdAt)) }
     val defaultCardBg = MaterialTheme.colorScheme.tertiaryContainer
     val cardBg = remember(notesBgColor) { parseColor(notesBgColor, defaultCardBg) }
+    val callDirection = remember(note.noteText) {
+        when {
+            note.noteText.startsWith(com.example.callnotes.ui.PostCallNoteUiState.PREFIX_INCOMING) -> "incoming"
+            note.noteText.startsWith(com.example.callnotes.ui.PostCallNoteUiState.PREFIX_OUTGOING) -> "outgoing"
+            else -> null
+        }
+    }
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -923,6 +984,23 @@ fun NoteCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top
             ) {
+                if (callDirection != null) {
+                    val dirIcon = if (callDirection == "incoming") Icons.AutoMirrored.Filled.CallReceived else Icons.AutoMirrored.Filled.CallMade
+                    // val dirColor = if (callDirection == "incoming") Color(0xFF4CAF50) else Color(0xFF2196F3)
+                    Icon(
+                        dirIcon,
+                        contentDescription = if (callDirection == "incoming") "Входящо" else "Изходящо",
+                        // tint = dirColor,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .padding(top = 2.dp)
+                            .combinedClickable(
+                                onClick = {},
+                                onLongClick = { onCallDirectionFilter(callDirection) }
+                            )
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
                 Text(
                     text = nameParts.first,
                     style = MaterialTheme.typography.titleSmall,
@@ -961,7 +1039,7 @@ fun NoteCard(
                 )
             }
             Spacer(modifier = Modifier.height(4.dp))
-            WordSelectableText(note.noteText, onSelectSearch)
+            WordSelectableText(com.example.callnotes.ui.PostCallNoteUiState.stripDirectionPrefix(note.noteText), onSelectSearch)
             Spacer(modifier = Modifier.height(6.dp))
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
                 val formattedOnlyDate = remember(note.createdAt) { SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(Date(note.createdAt)) }

@@ -184,7 +184,7 @@ Room съхранява контакти, call log и бележки напъл�
 id: Long
 phoneNumber: String уникален индекс
 displayName: String
-note: String
+note: String (с +/- индикатор за входящи/изходящи обаждания)
 createdAt: Long
 updatedAt: Long
 
@@ -193,8 +193,9 @@ updatedAt: Long
 id: Long
 phoneNumber: String
 callerName: String
-noteText: String
+noteText: String (с +/- индикатор за входящи/изходящи обаждания)
 createdAt: Long
+updatedAt: Long
 
 За бързо търсене направи индекс върху phoneNumber във всички таблици, а върху contacts.phoneNumber сложи unique index.
 

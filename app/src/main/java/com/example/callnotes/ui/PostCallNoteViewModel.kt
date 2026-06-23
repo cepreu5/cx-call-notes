@@ -19,8 +19,30 @@ data class PostCallNoteUiState(
     val availableTags: List<String> = emptyList(),
     val saved: Boolean = false,
     val isEditMode: Boolean = false,
-    val isNewContact: Boolean = false
-)
+    val isNewContact: Boolean = false,
+    val callDirection: String? = null
+) {
+    companion object {
+        const val PREFIX_INCOMING = "+ "
+        const val PREFIX_OUTGOING = "- "
+
+        fun stripDirectionPrefix(text: String): String {
+            return when {
+                text.startsWith(PREFIX_INCOMING) -> text.removePrefix(PREFIX_INCOMING)
+                text.startsWith(PREFIX_OUTGOING) -> text.removePrefix(PREFIX_OUTGOING)
+                else -> text
+            }
+        }
+
+        fun getDirectionPrefix(direction: String?): String? {
+            return when (direction) {
+                "incoming" -> PREFIX_INCOMING
+                "outgoing" -> PREFIX_OUTGOING
+                else -> null
+            }
+        }
+    }
+}
 
 class PostCallNoteViewModel(
     private val repository: CallNotesRepository,
@@ -29,7 +51,7 @@ class PostCallNoteViewModel(
     private val _uiState = MutableStateFlow(PostCallNoteUiState())
     val uiState: StateFlow<PostCallNoteUiState> = _uiState
     private val prefs = context.getSharedPreferences("cx_call_notes_prefs", Context.MODE_PRIVATE)
-    fun init(phone: String, noteId: Long? = null) {
+    fun init(phone: String, noteId: Long? = null, callDirection: String? = null) {
         val tagsStr = prefs.getString("tags_list", "Важно,Клиент,Агенция,Строител,Лични") ?: "Важно, Клиент, Агенция, Строител, Лични"
         val availableTags = tagsStr.split(",").map { it.trim() }.filter { it.isNotBlank() }
         var finalPhone = phone
@@ -42,7 +64,8 @@ class PostCallNoteViewModel(
             phoneNumber = finalPhone,
             callerName = finalName,
             noteId = noteId,
-            availableTags = availableTags
+            availableTags = availableTags,
+            callDirection = callDirection
         )
         if (noteId != null) {
             viewModelScope.launch {
@@ -51,7 +74,12 @@ class PostCallNoteViewModel(
                     _uiState.value = _uiState.value.copy(
                         phoneNumber = note.phoneNumber,
                         callerName = note.callerName ?: "",
-                        noteText = note.noteText,
+                        noteText = PostCallNoteUiState.stripDirectionPrefix(note.noteText),
+                        callDirection = when {
+                            note.noteText.startsWith(PostCallNoteUiState.PREFIX_INCOMING) -> "incoming"
+                            note.noteText.startsWith(PostCallNoteUiState.PREFIX_OUTGOING) -> "outgoing"
+                            else -> null
+                        },
                         isEditMode = true
                     )
                     val contact = repository.findContact(note.phoneNumber)
@@ -68,7 +96,12 @@ class PostCallNoteViewModel(
                     val selected = contact.tags?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
                     _uiState.value = _uiState.value.copy(
                         callerName = contact.displayName,
-                        noteText = contact.note ?: "",
+                        noteText = PostCallNoteUiState.stripDirectionPrefix(contact.note ?: ""),
+                        callDirection = when {
+                            contact.note?.startsWith(PostCallNoteUiState.PREFIX_INCOMING) == true -> "incoming"
+                            contact.note?.startsWith(PostCallNoteUiState.PREFIX_OUTGOING) == true -> "outgoing"
+                            else -> null
+                        },
                         selectedTags = selected,
                         isEditMode = true
                     )
@@ -117,14 +150,16 @@ class PostCallNoteViewModel(
         viewModelScope.launch {
             val s = _uiState.value
             val normPhone = com.example.callnotes.data.PhoneNumberNormalizer.normalize(s.phoneNumber)
-            repository.saveNote(normPhone, s.callerName.ifBlank { null }, s.noteText)
+            val prefix = PostCallNoteUiState.getDirectionPrefix(s.callDirection) ?: ""
+            val storedText = prefix + s.noteText
+            repository.saveNote(normPhone, s.callerName.ifBlank { null }, storedText)
             if (s.callerName.isNotBlank()) {
                 val tagsStr = s.selectedTags.joinToString(",")
                 repository.saveContact(
                     ContactEntity(
                         phoneNumber = normPhone,
                         displayName = s.callerName,
-                        note = s.noteText,
+                        note = storedText,
                         tags = tagsStr
                     )
                 )
@@ -136,6 +171,8 @@ class PostCallNoteViewModel(
         viewModelScope.launch {
             val s = _uiState.value
             val normPhone = com.example.callnotes.data.PhoneNumberNormalizer.normalize(s.phoneNumber)
+            val prefix = PostCallNoteUiState.getDirectionPrefix(s.callDirection) ?: ""
+            val storedText = prefix + s.noteText
             if (s.noteId != null) {
                 val existing = repository.findNote(s.noteId)
                 if (existing != null) {
@@ -143,7 +180,7 @@ class PostCallNoteViewModel(
                         existing.copy(
                             phoneNumber = normPhone,
                             callerName = s.callerName.ifBlank { null },
-                            noteText = s.noteText,
+                            noteText = storedText,
                             updatedAt = System.currentTimeMillis()
                         )
                     )
@@ -155,7 +192,7 @@ class PostCallNoteViewModel(
                     ContactEntity(
                         phoneNumber = normPhone,
                         displayName = s.callerName,
-                        note = s.noteText,
+                        note = storedText,
                         tags = tagsStr
                     )
                 )
