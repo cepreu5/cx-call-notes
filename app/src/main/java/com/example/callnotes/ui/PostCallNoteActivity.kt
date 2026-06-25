@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,6 +47,8 @@ class PostCallNoteActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        val nm = getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+        nm.cancel(com.example.callnotes.service.PhoneStateReceiver.NOTIFICATION_ID)
         val phone = intent.getStringExtra(EXTRA_PHONE) ?: ""
         val noteId = intent.getLongExtra(EXTRA_NOTE_ID, -1).takeIf { it >= 0 }
         val callDirection = intent.getStringExtra(EXTRA_CALL_DIRECTION)
@@ -55,6 +58,21 @@ class PostCallNoteActivity : ComponentActivity() {
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+            val km = getSystemService(android.content.Context.KEYGUARD_SERVICE) as android.app.KeyguardManager
+            km.requestDismissKeyguard(this, null)
+        } else {
+            window.addFlags(
+                android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                        or android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                        or android.view.WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+                        or android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+            )
+        }
+        val nm = getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+        nm.cancel(com.example.callnotes.service.PhoneStateReceiver.NOTIFICATION_ID)
         val systemHandle = intent.getParcelableExtra<android.net.Uri>(android.telecom.TelecomManager.EXTRA_HANDLE)
         val phone = systemHandle?.schemeSpecificPart ?: intent.getStringExtra(EXTRA_PHONE) ?: ""
         val noteId = intent.getLongExtra(EXTRA_NOTE_ID, -1).takeIf { it >= 0 }
@@ -190,6 +208,8 @@ class PostCallNoteActivity : ComponentActivity() {
                         onTagToggle = viewModel::toggleTag,
                         onSave = viewModel::save,
                         onUpdate = viewModel::updateNote,
+                        onLoadRecentCalls = viewModel::loadRecentCalls,
+                        onSelectRecentCall = viewModel::selectRecentCall,
                         onDismiss = {
                             if (fromCall) moveTaskToBack(true)
                             finish()
@@ -219,6 +239,8 @@ fun PostCallNoteScreen(
     onTagToggle: (String) -> Unit,
     onSave: () -> Unit,
     onUpdate: () -> Unit,
+    onLoadRecentCalls: () -> Unit,
+    onSelectRecentCall: (com.example.callnotes.ui.RecentCall) -> Unit,
     onDismiss: () -> Unit
 ) {
     val defaultBg = MaterialTheme.colorScheme.background
@@ -229,6 +251,7 @@ fun PostCallNoteScreen(
     val parsedFont = remember(fontColor, defaultFont) {
         if (fontColor == "default") defaultFont else parseColor(fontColor, defaultFont)
     }
+    var showRecentMenu by remember { mutableStateOf(false) }
     androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
@@ -262,16 +285,58 @@ fun PostCallNoteScreen(
                         fontWeight = FontWeight.Bold,
                         color = parsedFont
                     )
-                    IconButton(onClick = {
-                        onPhoneChange("")
-                        onCallerNameChange("")
-                        onNoteTextChange("")
-                    }) {
-                        Icon(
-                            Icons.Default.Clear,
-                            contentDescription = "Изчисти",
-                            tint = parsedFont
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box {
+                            IconButton(onClick = {
+                                onLoadRecentCalls()
+                                showRecentMenu = true
+                            }) {
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = "Последно обаждане",
+                                    tint = parsedFont
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showRecentMenu,
+                                onDismissRequest = { showRecentMenu = false }
+                            ) {
+                                if (state.recentCalls.isEmpty()) {
+                                    DropdownMenuItem(
+                                        text = { Text("Няма записи") },
+                                        onClick = { showRecentMenu = false }
+                                    )
+                                } else {
+                                    state.recentCalls.forEach { call ->
+                                        val dirText = when (call.type) {
+                                            1 -> "📞 Входящо"
+                                            2 -> "📤 Изходящо"
+                                            3 -> "❌ Пропуснато"
+                                            else -> "📞 Обаждане"
+                                        }
+                                        val labelText = if (call.name.isNotBlank()) call.name else call.number
+                                        DropdownMenuItem(
+                                            text = { Text("$dirText: $labelText") },
+                                            onClick = {
+                                                onSelectRecentCall(call)
+                                                showRecentMenu = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        IconButton(onClick = {
+                            onPhoneChange("")
+                            onCallerNameChange("")
+                            onNoteTextChange("")
+                        }) {
+                            Icon(
+                                Icons.Default.Clear,
+                                contentDescription = "Изчисти",
+                                tint = parsedFont
+                            )
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(10.dp))
@@ -306,6 +371,7 @@ fun PostCallNoteScreen(
                     onValueChange = onNoteTextChange,
                     label = { Text("Бележка") },
                     minLines = 3,
+                    textStyle = androidx.compose.ui.text.TextStyle(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, color = parsedFont),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = parsedFont,
                         unfocusedTextColor = parsedFont

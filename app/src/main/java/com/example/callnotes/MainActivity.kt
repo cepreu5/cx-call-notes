@@ -20,6 +20,8 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -59,6 +61,7 @@ import com.example.callnotes.ui.MainViewModelFactory
 import com.example.callnotes.ui.PostCallNoteViewModel
 import com.example.callnotes.ui.PostCallNoteViewModelFactory
 import com.example.callnotes.ui.PostCallNoteScreen
+import com.example.callnotes.ui.RecentCall
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -388,8 +391,11 @@ class MainActivity : ComponentActivity() {
                                 onTagToggle = noteViewModel::toggleTag,
                                 onSave = noteViewModel::save,
                                 onUpdate = noteViewModel::updateNote,
+                                onLoadRecentCalls = noteViewModel::loadRecentCalls,
+                                onSelectRecentCall = noteViewModel::selectRecentCall,
                                 onDismiss = {
                                     showPostCallNote = false
+                                    viewModel.load()
                                     if (fromCall) shouldMinimize = true
                                 }
                             )
@@ -528,12 +534,22 @@ class MainActivity : ComponentActivity() {
         }
     }
     private fun requestPermissionsIfNeeded() {
-        val perms = arrayOf(
-            Manifest.permission.READ_PHONE_STATE,
-            Manifest.permission.READ_CALL_LOG,
-            Manifest.permission.READ_CONTACTS,
-            Manifest.permission.CALL_PHONE
-        )
+        val perms = if (android.os.Build.VERSION.SDK_INT >= 33) {
+            arrayOf(
+                Manifest.permission.READ_PHONE_STATE,
+                Manifest.permission.READ_CALL_LOG,
+                Manifest.permission.READ_CONTACTS,
+                Manifest.permission.CALL_PHONE,
+                Manifest.permission.POST_NOTIFICATIONS
+            )
+        } else {
+            arrayOf(
+                Manifest.permission.READ_PHONE_STATE,
+                Manifest.permission.READ_CALL_LOG,
+                Manifest.permission.READ_CONTACTS,
+                Manifest.permission.CALL_PHONE
+            )
+        }
         val needed = perms.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
         if (needed.isNotEmpty()) {
             val prefs = getSharedPreferences("cx_call_notes_prefs", Context.MODE_PRIVATE)
@@ -593,6 +609,18 @@ fun MainScreen(
     onLongCall: (String, String) -> Unit,
     onCallDirectionFilter: (String?) -> Unit
 ) {
+    val contactsListState = rememberLazyListState()
+    val notesListState = rememberLazyListState()
+    LaunchedEffect(state.contacts.size) {
+        if (state.contacts.isNotEmpty()) {
+            contactsListState.scrollToItem(0)
+        }
+    }
+    LaunchedEffect(state.notes.size) {
+        if (state.notes.isNotEmpty()) {
+            notesListState.scrollToItem(0)
+        }
+    }
     Column {
         OutlinedTextField(
             value = state.searchQuery,
@@ -661,7 +689,8 @@ fun MainScreen(
                 onLoadMore = onLoadMoreContacts,
                 onEdit = onEditContact,
                 onLongCall = onLongCall,
-                onCallDirectionFilter = onCallDirectionFilter
+                onCallDirectionFilter = onCallDirectionFilter,
+                listState = contactsListState
             )
             1 -> NotesList(
                 notes = state.notes,
@@ -673,7 +702,8 @@ fun MainScreen(
                 onLoadMore = onLoadMoreNotes,
                 onEdit = onEditNote,
                 onLongCall = onLongCall,
-                onCallDirectionFilter = onCallDirectionFilter
+                onCallDirectionFilter = onCallDirectionFilter,
+                listState = notesListState
             )
         }
     }
@@ -690,7 +720,8 @@ fun ContactsList(
     onLoadMore: () -> Unit,
     onEdit: (ContactEntity) -> Unit,
     onLongCall: (String, String) -> Unit,
-    onCallDirectionFilter: (String?) -> Unit
+    onCallDirectionFilter: (String?) -> Unit,
+    listState: LazyListState
 ) {
     if (contacts.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -713,6 +744,7 @@ fun ContactsList(
         val visibleContacts = remember(contacts, limit) { contacts.take(limit) }
         val hasMore = remember(contacts, limit) { contacts.size > limit }
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -841,7 +873,7 @@ fun ContactCard(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = displayNote,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
                     color = MaterialTheme.colorScheme.secondary,
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -893,7 +925,8 @@ fun NotesList(
     onLoadMore: () -> Unit,
     onEdit: (CallNoteEntity) -> Unit,
     onLongCall: (String, String) -> Unit,
-    onCallDirectionFilter: (String?) -> Unit
+    onCallDirectionFilter: (String?) -> Unit,
+    listState: LazyListState
 ) {
     if (notes.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -916,6 +949,7 @@ fun NotesList(
         val visibleNotes = remember(notes, limit) { notes.take(limit) }
         val hasMore = remember(notes, limit) { notes.size > limit }
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -1066,7 +1100,7 @@ fun WordSelectableText(text: String, onSelectWord: (String) -> Unit) {
             val cleanWord = word.trim().replace(Regex("[.,!?;:]"), "")
             Text(
                 text = word + " ",
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyMedium.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
                 color = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.combinedClickable(
                     onClick = {},
@@ -1101,17 +1135,24 @@ fun TagChip(tag: String, onSelectSearch: (String) -> Unit) {
 @Composable
 fun SwipeToDeleteWrapper(appBgColor: String, onDelete: () -> Unit, content: @Composable () -> Unit) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val screenWidthPx = with(density) { androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp.toPx() }
+    val dismissStateRef = remember { arrayOfNulls<androidx.compose.material3.SwipeToDismissBoxState>(1) }
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = {
             if (it == SwipeToDismissBoxValue.StartToEnd) {
-                showDeleteConfirm = true
+                val offset = try { dismissStateRef[0]?.requireOffset() ?: 0f } catch (_: Exception) { 0f }
+                if (offset >= screenWidthPx * 0.5f) {
+                    showDeleteConfirm = true
+                }
                 false
             } else {
                 false
             }
         },
-        positionalThreshold = { distance -> distance * 0.95f }
+        positionalThreshold = { distance -> distance * 0.5f }
     )
+    dismissStateRef[0] = dismissState
     val parsedAppBg = remember(appBgColor) {
         if (appBgColor == "default") Color.Transparent else parseColor(appBgColor, Color.Transparent)
     }

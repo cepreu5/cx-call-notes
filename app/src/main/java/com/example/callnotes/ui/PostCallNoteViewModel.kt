@@ -10,6 +10,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
+data class RecentCall(
+    val number: String,
+    val name: String,
+    val type: Int,
+    val date: Long
+)
+
 data class PostCallNoteUiState(
     val phoneNumber: String = "",
     val callerName: String = "",
@@ -20,7 +27,8 @@ data class PostCallNoteUiState(
     val saved: Boolean = false,
     val isEditMode: Boolean = false,
     val isNewContact: Boolean = false,
-    val callDirection: String? = null
+    val callDirection: String? = null,
+    val recentCalls: List<RecentCall> = emptyList()
 ) {
     companion object {
         const val PREFIX_INCOMING = "+ "
@@ -54,15 +62,8 @@ class PostCallNoteViewModel(
     fun init(phone: String, noteId: Long? = null, callDirection: String? = null) {
         val tagsStr = prefs.getString("tags_list", "Важно,Клиент,Агенция,Строител,Лични") ?: "Важно, Клиент, Агенция, Строител, Лични"
         val availableTags = tagsStr.split(",").map { it.trim() }.filter { it.isNotBlank() }
-        var finalPhone = phone
-        var finalName = ""
-        if (finalPhone.isBlank() && noteId == null) {
-            finalPhone = prefs.getString("last_call_phone", "") ?: ""
-            finalName = prefs.getString("last_call_name", "") ?: ""
-        }
         _uiState.value = PostCallNoteUiState(
-            phoneNumber = finalPhone,
-            callerName = finalName,
+            phoneNumber = phone,
             noteId = noteId,
             availableTags = availableTags,
             callDirection = callDirection
@@ -89,15 +90,15 @@ class PostCallNoteViewModel(
                     }
                 }
             }
-        } else if (finalPhone.isNotBlank()) {
+        } else if (phone.isNotBlank()) {
             viewModelScope.launch {
-                val contact = repository.findContact(finalPhone)
+                val contact = repository.findContact(phone)
                 if (contact != null) {
                     val selected = contact.tags?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
                     _uiState.value = _uiState.value.copy(
                         callerName = contact.displayName,
                         noteText = PostCallNoteUiState.stripDirectionPrefix(contact.note ?: ""),
-                        callDirection = when {
+                        callDirection = callDirection ?: when {
                             contact.note?.startsWith(PostCallNoteUiState.PREFIX_INCOMING) == true -> "incoming"
                             contact.note?.startsWith(PostCallNoteUiState.PREFIX_OUTGOING) == true -> "outgoing"
                             else -> null
@@ -106,12 +107,75 @@ class PostCallNoteViewModel(
                         isEditMode = true
                     )
                 } else {
-                    val systemName = getNameFromPhoneContacts(finalPhone) ?: ""
+                    val systemName = getNameFromPhoneContacts(phone) ?: ""
                     if (systemName.isNotBlank()) {
                         _uiState.value = _uiState.value.copy(callerName = systemName)
                     }
                     _uiState.value = _uiState.value.copy(isNewContact = true)
                 }
+            }
+        }
+    }
+    fun loadRecentCalls() {
+        if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_CALL_LOG) != android.content.pm.PackageManager.PERMISSION_GRANTED) return
+        val list = mutableListOf<RecentCall>()
+        val cursor = context.contentResolver.query(
+            android.provider.CallLog.Calls.CONTENT_URI,
+            arrayOf(
+                android.provider.CallLog.Calls.NUMBER,
+                android.provider.CallLog.Calls.CACHED_NAME,
+                android.provider.CallLog.Calls.TYPE,
+                android.provider.CallLog.Calls.DATE
+            ),
+            null,
+            null,
+            "${android.provider.CallLog.Calls.DATE} DESC"
+        )
+        cursor?.use { c ->
+            val numIdx = c.getColumnIndex(android.provider.CallLog.Calls.NUMBER)
+            val nameIdx = c.getColumnIndex(android.provider.CallLog.Calls.CACHED_NAME)
+            val typeIdx = c.getColumnIndex(android.provider.CallLog.Calls.TYPE)
+            val dateIdx = c.getColumnIndex(android.provider.CallLog.Calls.DATE)
+            var count = 0
+            while (c.moveToNext() && count < 5) {
+                val number = c.getString(numIdx) ?: ""
+                val name = c.getString(nameIdx) ?: ""
+                val type = c.getInt(typeIdx)
+                val date = c.getLong(dateIdx)
+                list.add(RecentCall(number, name, type, date))
+                count++
+            }
+        }
+        _uiState.value = _uiState.value.copy(recentCalls = list)
+    }
+    fun selectRecentCall(call: RecentCall) {
+        val direction = when (call.type) {
+            1 -> "incoming"
+            2 -> "outgoing"
+            3 -> "incoming"
+            else -> null
+        }
+        _uiState.value = _uiState.value.copy(
+            phoneNumber = call.number,
+            callerName = call.name.ifBlank { getNameFromPhoneContacts(call.number) ?: "" },
+            isNewContact = true,
+            isEditMode = false,
+            noteText = "",
+            selectedTags = emptySet(),
+            callDirection = direction
+        )
+        viewModelScope.launch {
+            val contact = repository.findContact(call.number)
+            if (contact != null) {
+                val selected = contact.tags?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+                _uiState.value = _uiState.value.copy(
+                    callerName = contact.displayName,
+                    noteText = PostCallNoteUiState.stripDirectionPrefix(contact.note ?: ""),
+                    selectedTags = selected,
+                    isEditMode = true,
+                    isNewContact = false,
+                    callDirection = direction
+                )
             }
         }
     }

@@ -1,10 +1,14 @@
 package com.example.callnotes.service
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.telephony.TelephonyManager
 import android.util.Log
+import androidx.core.app.NotificationCompat
 import com.example.callnotes.data.DatabaseProvider
 import com.example.callnotes.data.PhoneNumberNormalizer
 import com.example.callnotes.ui.PostCallNoteActivity
@@ -17,7 +21,9 @@ class PhoneStateReceiver : BroadcastReceiver() {
         private var lastState = TelephonyManager.CALL_STATE_IDLE
         private var incomingNumber: String? = null
         private var wasRinging = false
-        private const val OUTGOING_CALL_TYPE = 3
+        private const val OUTGOING_CALL_TYPE = 2
+        private const val CHANNEL_ID = "cx_call_notes_channel"
+        const val NOTIFICATION_ID = 9999
     }
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != TelephonyManager.ACTION_PHONE_STATE_CHANGED) return
@@ -71,19 +77,12 @@ class PhoneStateReceiver : BroadcastReceiver() {
                         val contact = db.contactDao().findByPhone(phone)
                         val name = contact?.displayName ?: ""
                         prefs.edit().putString("last_call_phone", phone).putString("last_call_name", name).apply()
-
                         if (!name.startsWith("#")) {
                             Log.d("CXCalls", "PhoneStateReceiver: IDLE after call, launching PostCallNoteActivity")
                             try {
                                 context.applicationContext.stopService(Intent(context.applicationContext, OverlayService::class.java))
                             } catch (_: Exception) {}
-                            val activityIntent = Intent(context.applicationContext, PostCallNoteActivity::class.java).apply {
-                                putExtra(PostCallNoteActivity.EXTRA_PHONE, phone)
-                                putExtra(PostCallNoteActivity.EXTRA_FROM_CALL, true)
-                                putExtra(PostCallNoteActivity.EXTRA_CALL_DIRECTION, "incoming")
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                            }
-                            context.applicationContext.startActivity(activityIntent)
+                            launchActivityWithNotification(context, phone, contact?.displayName, "incoming")
                         } else {
                             Log.d("CXCalls", "PhoneStateReceiver: Contact excluded (starts with #), skipping PostCallNoteActivity")
                         }
@@ -109,13 +108,7 @@ class PhoneStateReceiver : BroadcastReceiver() {
                             val prefs = context.getSharedPreferences("cx_call_notes_prefs", Context.MODE_PRIVATE)
                             prefs.edit().putString("last_call_phone", normalizedPhone).putString("last_call_name", name).apply()
                             if (!name.startsWith("#")) {
-                                val activityIntent = Intent(context.applicationContext, PostCallNoteActivity::class.java).apply {
-                                    putExtra(PostCallNoteActivity.EXTRA_PHONE, normalizedPhone)
-                                    putExtra(PostCallNoteActivity.EXTRA_FROM_CALL, true)
-                                    putExtra(PostCallNoteActivity.EXTRA_CALL_DIRECTION, "outgoing")
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                                }
-                                context.applicationContext.startActivity(activityIntent)
+                                launchActivityWithNotification(context, normalizedPhone, contact?.displayName, "outgoing")
                             }
                         }
                     }
@@ -125,5 +118,43 @@ class PhoneStateReceiver : BroadcastReceiver() {
                 lastState = TelephonyManager.CALL_STATE_IDLE
             }
         }
+    }
+    private fun launchActivityWithNotification(context: Context, phone: String, contactName: String?, direction: String) {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(CHANNEL_ID, "CX Call Notes Alert", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Показва форма след разговор"
+                enableLights(true)
+                enableVibration(true)
+            }
+            notificationManager.createNotificationChannel(channel)
+        }
+        val activityIntent = Intent(context.applicationContext, PostCallNoteActivity::class.java).apply {
+            putExtra(PostCallNoteActivity.EXTRA_PHONE, phone)
+            putExtra(PostCallNoteActivity.EXTRA_FROM_CALL, true)
+            putExtra(PostCallNoteActivity.EXTRA_CALL_DIRECTION, direction)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
+        try {
+            context.applicationContext.startActivity(activityIntent)
+        } catch (e: Exception) {
+            Log.e("CXCalls", "Direct startActivity failed: ${e.message}", e)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            0,
+            activityIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val displayName = if (!contactName.isNullOrBlank()) contactName else phone
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.sym_action_chat)
+            .setContentTitle("CX Call Notes")
+            .setContentText("Добави бележка за $displayName")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_CALL)
+            .setAutoCancel(true)
+            .setFullScreenIntent(pendingIntent, true)
+        notificationManager.notify(NOTIFICATION_ID, builder.build())
     }
 }
