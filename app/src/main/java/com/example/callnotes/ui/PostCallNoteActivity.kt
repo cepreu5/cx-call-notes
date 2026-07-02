@@ -114,31 +114,7 @@ class PostCallNoteActivity : ComponentActivity() {
                     if (fromCall) moveTaskToBack(true)
                     finish()
                 }
-                val savedBackupUri = prefs.getString("backup_uri", null)
-                if (savedBackupUri != null) {
-                    val savedUri = android.net.Uri.parse(savedBackupUri)
-                    LaunchedEffect(Unit) {
-                        lifecycleScope.launch {
-                            val exists = try {
-                                contentResolver.openInputStream(savedUri)?.close()
-                                true
-                            } catch (_: Exception) { false }
-                            if (exists) {
-                                val success = com.example.callnotes.data.BackupManager.exportFull(
-                                    this@PostCallNoteActivity, savedUri, repository
-                                )
-                                if (success) {
-                                    prefs.edit().putLong("last_backup_date", System.currentTimeMillis()).apply()
-                                }
-                                if (fromCall) moveTaskToBack(true)
-                                finish()
-                            } else {
-                                prefs.edit().remove("backup_uri").apply()
-                                backupLauncher.launch("cx-call-notes-backup.json")
-                            }
-                        }
-                    }
-                }
+
                 LaunchedEffect(state.saved) {
                     if (state.saved) {
                         if (backupDue) showBackupReminder = true
@@ -349,6 +325,13 @@ fun PostCallNoteScreen(
                         focusedTextColor = parsedFont,
                         unfocusedTextColor = parsedFont
                     ),
+                    trailingIcon = {
+                        if (state.phoneNumber.isNotEmpty()) {
+                            IconButton(onClick = { onPhoneChange("") }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Изчисти", tint = parsedFont)
+                            }
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
@@ -357,11 +340,18 @@ fun PostCallNoteScreen(
                     value = state.callerName,
                     onValueChange = onCallerNameChange,
                     label = { Text("Име") },
-                    singleLine = true,
+                    maxLines = 3,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = parsedFont,
                         unfocusedTextColor = parsedFont
                     ),
+                    trailingIcon = {
+                        if (state.callerName.isNotEmpty()) {
+                            IconButton(onClick = { onCallerNameChange("") }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Изчисти", tint = parsedFont)
+                            }
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )

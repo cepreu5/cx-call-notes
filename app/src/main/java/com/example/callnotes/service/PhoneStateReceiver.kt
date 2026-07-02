@@ -24,6 +24,7 @@ class PhoneStateReceiver : BroadcastReceiver() {
         private const val OUTGOING_CALL_TYPE = 2
         private const val CHANNEL_ID = "cx_call_notes_channel"
         const val NOTIFICATION_ID = 9999
+        @Volatile var screenedNumber: String? = null
     }
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != TelephonyManager.ACTION_PHONE_STATE_CHANGED) return
@@ -35,6 +36,9 @@ class PhoneStateReceiver : BroadcastReceiver() {
                 wasRinging = true
                 if (number != null) {
                     incomingNumber = number
+                } else if (incomingNumber == null && screenedNumber != null) {
+                    incomingNumber = screenedNumber
+                    Log.d("CXCalls", "Using screenedNumber fallback: $incomingNumber")
                 }
                 Log.d("CXCalls", "RINGING: incomingNumber=$incomingNumber")
                 if (incomingNumber != null) {
@@ -115,6 +119,7 @@ class PhoneStateReceiver : BroadcastReceiver() {
                 }
                 wasRinging = false
                 incomingNumber = null
+                screenedNumber = null
                 lastState = TelephonyManager.CALL_STATE_IDLE
             }
         }

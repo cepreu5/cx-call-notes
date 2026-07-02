@@ -90,6 +90,15 @@ class PostCallNoteViewModel(
                     }
                 }
             }
+        } else if (phone.isBlank() && noteId == null) {
+            val lastNumber = getLastCallLogNumber()
+            if (!lastNumber.isNullOrBlank()) {
+                val systemName = getNameFromPhoneContacts(lastNumber) ?: ""
+                _uiState.value = _uiState.value.copy(
+                    phoneNumber = lastNumber,
+                    callerName = systemName
+                )
+            }
         } else if (phone.isNotBlank()) {
             viewModelScope.launch {
                 val contact = repository.findContact(phone)
@@ -185,6 +194,22 @@ class PostCallNoteViewModel(
         val projection = arrayOf(android.provider.ContactsContract.PhoneLookup.DISPLAY_NAME)
         try {
             context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    return cursor.getString(0)
+                }
+            }
+        } catch (_: Exception) {}
+        return null
+    }
+    private fun getLastCallLogNumber(): String? {
+        if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_CALL_LOG) != android.content.pm.PackageManager.PERMISSION_GRANTED) return null
+        try {
+            context.contentResolver.query(
+                android.provider.CallLog.Calls.CONTENT_URI,
+                arrayOf(android.provider.CallLog.Calls.NUMBER),
+                null, null,
+                "${android.provider.CallLog.Calls.DATE} DESC"
+            )?.use { cursor ->
                 if (cursor.moveToFirst()) {
                     return cursor.getString(0)
                 }

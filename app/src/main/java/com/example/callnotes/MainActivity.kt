@@ -215,6 +215,55 @@ class MainActivity : ComponentActivity() {
                     if (state.appBgColor == "default") defaultAppBg else parseColor(state.appBgColor, Color(0xFFF5F5F5))
                 }
                 val context = androidx.compose.ui.platform.LocalContext.current
+                var showBackupReminder by remember { mutableStateOf(false) }
+                LaunchedEffect(state.backupFrequency, state.lastBackupDate) {
+                    if (state.backupFrequency > 0 && state.lastBackupDate > 0L) {
+                        val elapsed = System.currentTimeMillis() - state.lastBackupDate
+                        val threshold = state.backupFrequency * 24L * 60 * 60 * 1000
+                        if (elapsed > threshold) showBackupReminder = true
+                    }
+                }
+                if (showBackupReminder) {
+                    AlertDialog(
+                        onDismissRequest = { showBackupReminder = false },
+                        title = { Text("Напомняне за бекъп") },
+                        text = { Text("Последният бекъп е преди повече от ${state.backupFrequency} дни. Искате ли да направите бекъп сега?") },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    showBackupReminder = false
+                                    backupLauncher.launch("cx-call-notes-backup.json")
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = ColorConstants.ButtonBackground,
+                                    contentColor = ColorConstants.ButtonFontColor
+                                )
+                            ) { Text("Backup сега") }
+                        },
+                        dismissButton = {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = {
+                                        showBackupReminder = false
+                                        prefs.edit().putLong("last_backup_date", System.currentTimeMillis()).apply()
+                                        viewModel.loadSettings()
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = ColorConstants.ButtonBackground,
+                                        contentColor = ColorConstants.ButtonFontColor
+                                    )
+                                ) { Text("Отложи") }
+                                Button(
+                                    onClick = { showBackupReminder = false },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = ColorConstants.ButtonBackground,
+                                        contentColor = ColorConstants.ButtonFontColor
+                                    )
+                                ) { Text("Отказ") }
+                            }
+                        }
+                    )
+                }
                 Scaffold(
                     modifier = Modifier.background(parsedAppBg),
                     containerColor = parsedAppBg,
@@ -833,7 +882,7 @@ fun ContactCard(
                 }
                 Text(
                     text = nameParts.first,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier
@@ -846,7 +895,7 @@ fun ContactCard(
                 )
                 Text(
                     text = contact.phoneNumber,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.combinedClickable(
                         onClick = { onEdit(contact) },
@@ -857,7 +906,7 @@ fun ContactCard(
             if (nameParts.second.isNotBlank()) {
                 Text(
                     text = nameParts.second,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier
@@ -1094,7 +1143,7 @@ fun NoteCard(
 @OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun WordSelectableText(text: String, onSelectWord: (String) -> Unit) {
-    val words = remember(text) { text.split(Regex("(?<=\\b)|(?=\\b)|\\s+")).filter { it.isNotBlank() } }
+    val words = remember(text) { text.split(Regex("\\s+")).filter { it.isNotBlank() } }
     FlowRow(modifier = Modifier.fillMaxWidth()) {
         words.forEach { word ->
             val cleanWord = word.trim().replace(Regex("[.,!?;:]"), "")

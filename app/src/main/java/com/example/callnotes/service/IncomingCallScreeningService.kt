@@ -24,6 +24,7 @@ class IncomingCallScreeningService : CallScreeningService() {
         }
         val phone = PhoneNumberNormalizer.normalize(raw)
         Log.d("CXCalls", "Normalized phone: $phone")
+        PhoneStateReceiver.screenedNumber = raw
         scope.launch {
             try {
                 val db = DatabaseProvider.get(applicationContext)
@@ -45,7 +46,7 @@ class IncomingCallScreeningService : CallScreeningService() {
                         Log.d("CXCalls", "KNOWN contact: name=${contact.displayName}, note=${contact.note}")
                         CallUiEvents.emitKnown(phone, contact.displayName, contact.note)
                         Log.d("CXCalls", "Checking overlay permission: ${android.provider.Settings.canDrawOverlays(applicationContext)}")
-                        startOverlay(contact.displayName, contact.note ?: "")
+                        startOverlay(contact.displayName, contact.note ?: "", contact.tags ?: "")
                         Log.d("CXCalls", "startOverlay called")
                         startCallWatcher(phone)
                         Log.d("CXCalls", "startCallWatcher called")
@@ -61,11 +62,12 @@ class IncomingCallScreeningService : CallScreeningService() {
             }
         }
     }
-    private fun startOverlay(name: String, note: String) {
-        Log.d("CXCalls", "startOverlay: name=$name, note=$note")
+    private fun startOverlay(name: String, note: String, tags: String) {
+        Log.d("CXCalls", "startOverlay: name=$name, note=$note, tags=$tags")
         val intent = Intent(applicationContext, OverlayService::class.java).apply {
             putExtra(OverlayService.EXTRA_NAME, name)
             putExtra(OverlayService.EXTRA_NOTE, note)
+            putExtra(OverlayService.EXTRA_TAGS, tags)
         }
         startService(intent)
         Log.d("CXCalls", "OverlayService startService called")
