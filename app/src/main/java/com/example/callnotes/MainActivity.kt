@@ -1545,6 +1545,40 @@ fun SettingsDialog(
                 var pickerG by remember { mutableIntStateOf(20) }
                 var pickerB by remember { mutableIntStateOf(20) }
                 var pickerHex by remember { mutableStateOf("#141414") }
+                OutlinedTextField(
+                    value = tagsInput,
+                    onValueChange = { tagsInput = it },
+                    label = { Text("Етикети (до 20)", color = settingsFont) },
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = settingsFont, unfocusedTextColor = settingsFont, focusedLabelColor = settingsFont, unfocusedLabelColor = settingsFont)
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = !fabHidden,
+                        onCheckedChange = {
+                            fabHidden = !it
+                            onFabHiddenChange(!it)
+                        }
+                    )
+                    Text("Меню бутон", color = settingsFont)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("${fabTransparency.toInt()}%", color = settingsFont, modifier = Modifier.width(60.dp))
+                    Slider(
+                        value = fabTransparency,
+                        onValueChange = { fabTransparency = it },
+                        onValueChangeFinished = { onFabTransparencyChange(fabTransparency.toInt()) },
+                        valueRange = 0f..100f,
+                        modifier = Modifier.weight(1f).height(24.dp),
+                        enabled = !fabHidden
+                    )
+                }
                 LaunchedEffect(selectedSetting) {
                     val hex = colorSettings[selectedSetting].second
                     val parsed = try {
@@ -1582,6 +1616,7 @@ fun SettingsDialog(
                     val fontHex = colorSettings[fontIdx].second
                     if (fontHex == "default") colorDefaults[fontIdx] else Color(android.graphics.Color.parseColor(fontHex))
                 } catch (_: Exception) { colorDefaults[selectedSetting + 1.coerceAtMost(1)] }
+                HorizontalDivider(color = settingsFont)
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp),
@@ -1731,43 +1766,8 @@ fun SettingsDialog(
                 ) {
                     Text("Reset цветове")
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = tagsInput,
-                    onValueChange = { tagsInput = it },
-                    label = { Text("Етикети (до 20)", color = settingsFont) },
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = settingsFont, unfocusedTextColor = settingsFont, focusedLabelColor = settingsFont, unfocusedLabelColor = settingsFont)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Checkbox(
-                        checked = !fabHidden,
-                        onCheckedChange = {
-                            fabHidden = !it
-                            onFabHiddenChange(!it)
-                        }
-                    )
-                    Text("Меню бутон", color = settingsFont)
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text("${fabTransparency.toInt()}%", color = settingsFont, modifier = Modifier.width(60.dp))
-                    Slider(
-                        value = fabTransparency,
-                        onValueChange = { fabTransparency = it },
-                        onValueChangeFinished = { onFabTransparencyChange(fabTransparency.toInt()) },
-                        valueRange = 0f..100f,
-                        modifier = Modifier.weight(1f).height(24.dp),
-                        enabled = !fabHidden
-                    )
-                }
-                Spacer(modifier = Modifier.height(12.dp))
+                // Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = settingsFont)
                 Text("Архивиране", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, color = settingsFont)
                 // Spacer(modifier = Modifier.height(4.dp))
                 Row(
@@ -1839,15 +1839,18 @@ fun SettingsDialog(
                     } else "Не е правен архив"
                 }
                 Text(lastBackupText, style = MaterialTheme.typography.bodySmall, color = settingsFont)
-                Spacer(modifier = Modifier.height(8.dp))
+                // Spacer(modifier = Modifier.height(8.dp))
             }
         },
         confirmButton = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                HorizontalDivider(color = settingsFont)
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                 Button(
                     onClick = onDismiss,
                     colors = ButtonDefaults.buttonColors(
@@ -1872,6 +1875,7 @@ fun SettingsDialog(
                     )
                 ) {
                     Text("Запази")
+                }
                 }
             }
         },
